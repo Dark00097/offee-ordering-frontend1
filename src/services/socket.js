@@ -8,6 +8,7 @@ const socket = io(import.meta.env.VITE_API_URL || 'https://coffee-ordering-backe
   reconnectionAttempts: 10,
   reconnectionDelay: 1000,
   reconnectionDelayMax: 5000,
+  transports: ['websocket', 'polling'], // Explicitly allow both transports
 });
 
 export const initSocket = (
