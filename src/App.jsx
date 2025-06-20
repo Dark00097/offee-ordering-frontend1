@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import { api } from './services/api';
 import { v4 as uuidv4 } from 'uuid';
+import { initSocket, reinitializeSocket } from './services/socket'; // Import reinitializeSocket
 import Home from './pages/Home';
 import Login from './pages/Login';
 import AdminDashboard from './pages/AdminDashboard';
@@ -42,6 +43,7 @@ function App() {
   const [latestOrderId, setLatestOrderId] = useState(null);
   const [user, setUser] = useState(null);
   const [sessionId, setSessionId] = useState(null);
+  const [socketCleanup, setSocketCleanup] = useState(null); // Track socket cleanup function
 
   const handleNewNotification = (notification) => {
     if (!notification.id) {
@@ -49,6 +51,19 @@ function App() {
       return;
     }
     toast.info(notification.message, { autoClose: 5000 });
+  };
+
+  const initializeSocket = () => {
+    const cleanup = initSocket(
+      () => {},
+      () => {},
+      () => {},
+      () => {},
+      () => {},
+      () => {},
+      handleNewNotification
+    );
+    setSocketCleanup(() => cleanup);
   };
 
   useEffect(() => {
@@ -94,15 +109,41 @@ function App() {
       };
 
       await Promise.all([checkAuth(), fetchPromotions()]);
+      initializeSocket(); // Initialize socket after session setup
     };
 
     initializeApp();
 
-    return () => {};
+    return () => {
+      if (socketCleanup) socketCleanup();
+    };
   }, []);
 
-  const handleLogin = (user) => {
+  const handleLogin = async (user) => {
     setUser(user);
+    // Refresh session ID after login
+    try {
+      const response = await api.get('/session');
+      const newSessionId = response.data.sessionId;
+      if (newSessionId) {
+        setSessionId(newSessionId);
+        localStorage.setItem('sessionId', newSessionId);
+        api.defaults.headers.common['X-Session-Id'] = newSessionId;
+        // Reinitialize socket with new session ID
+        const cleanup = reinitializeSocket({
+          onNewOrder: () => {},
+          onOrderUpdate: () => {},
+          onTableStatusUpdate: () => {},
+          onReservationUpdate: () => {},
+          onRatingUpdate: () => {},
+          onOrderApproved: () => {},
+          onNewNotification: handleNewNotification,
+        });
+        setSocketCleanup(() => cleanup);
+      }
+    } catch (error) {
+      console.error('Error refreshing session ID after login:', error);
+    }
     navigate(user.role === 'admin' ? '/admin' : '/staff');
   };
 
@@ -114,6 +155,8 @@ function App() {
       setDeliveryAddress('');
       setPromotionId('');
       setIsCartOpen(false);
+      // Reinitialize socket after logout
+      initializeSocket();
       toast.success('Successfully logged out');
       navigate('/');
     } catch (error) {
@@ -345,8 +388,8 @@ function App() {
         <Route path="/category/:id" element={<CategoryMenu addToCart={addToCart} />} />
         <Route path="/product/:id" element={<ProductDetails addToCart={addToCart} latestOrderId={latestOrderId} />} />
         <Route path="/order-waiting/:orderId" element={<OrderWaiting sessionId={sessionId} />} />
-        <Route path="/breakfast" element={<BreakfastMenu addToCart={addToCart} />} /> {/* Updated to /breakfast for full menu */}
-        <Route path="/breakfast/:id" element={<BreakfastMenu addToCart={addToCart} />} /> {/* Added for single breakfast */}
+        <Route path="/breakfast" element={<BreakfastMenu addToCart={addToCart} />} />
+        <Route path="/breakfast/:id" element={<BreakfastMenu addToCart={addToCart} />} />
         <Route path="*" element={<div style={{ textAlign: 'center', color: '#666' }}>404 Not Found</div>} />
       </Routes>
       <CartModal

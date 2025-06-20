@@ -12,6 +12,8 @@ const socket = io(import.meta.env.VITE_API_URL || 'https://coffee-ordering-backe
   path: '/socket.io/', // Match backend Socket.IO path
 });
 
+let currentCleanup = null;
+
 export const initSocket = (
   onNewOrder = () => {},
   onOrderUpdate = () => {},
@@ -21,7 +23,10 @@ export const initSocket = (
   onOrderApproved = () => {},
   onNewNotification = () => {}
 ) => {
-  let cleanup = () => {};
+  // Clean up previous listeners if they exist
+  if (currentCleanup) {
+    currentCleanup();
+  }
 
   const initializeSocket = async () => {
     try {
@@ -79,6 +84,10 @@ export const initSocket = (
         if (typeof onNewNotification === 'function') onNewNotification(data);
       });
 
+      socket.on('session-error', (error) => {
+        console.error('Session error from server:', error.message);
+      });
+
       socket.on('disconnect', () => {
         console.log('Socket disconnected, attempting to reconnect...');
       });
@@ -96,7 +105,7 @@ export const initSocket = (
         console.error('Socket connect error:', error.message);
       });
 
-      cleanup = () => {
+      currentCleanup = () => {
         socket.off('connect');
         socket.off('newOrder');
         socket.off('orderUpdate');
@@ -106,6 +115,11 @@ export const initSocket = (
         socket.off('order-approved');
         socket.off('orderApproved');
         socket.off('newNotification');
+        socket.off('session-error');
+        socket.off('disconnect');
+        socket.off('reconnect');
+        socket.off('reconnect_error');
+        socket.off('connect_error');
         console.log('Socket listeners removed');
         socket.disconnect();
       };
@@ -113,12 +127,25 @@ export const initSocket = (
       console.log('Socket initialized with session:', sessionId);
     } catch (error) {
       console.error('Error initializing socket:', error.message, error);
+      currentCleanup = () => {};
     }
   };
 
   initializeSocket();
 
-  return cleanup;
+  return currentCleanup;
+};
+
+export const reinitializeSocket = (callbacks) => {
+  return initSocket(
+    callbacks.onNewOrder,
+    callbacks.onOrderUpdate,
+    callbacks.onTableStatusUpdate,
+    callbacks.onReservationUpdate,
+    callbacks.onRatingUpdate,
+    callbacks.onOrderApproved,
+    callbacks.onNewNotification
+  );
 };
 
 export default socket;
