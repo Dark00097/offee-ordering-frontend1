@@ -9,6 +9,7 @@ const socket = io(import.meta.env.VITE_API_URL || 'https://coffee-ordering-backe
   reconnectionDelay: 1000,
   reconnectionDelayMax: 5000,
   transports: ['websocket', 'polling'], // Explicitly allow both transports
+  path: '/socket.io/', // Match backend Socket.IO path
 });
 
 export const initSocket = (
@@ -27,7 +28,7 @@ export const initSocket = (
       const response = await api.getSession();
       const sessionId = response.data.sessionId;
       if (!sessionId) {
-        console.error('Failed to retrieve session ID from server');
+        console.error('Failed to retrieve session ID from server:', response);
         return () => {};
       }
 
@@ -91,6 +92,10 @@ export const initSocket = (
         console.error('Socket reconnection error:', error);
       });
 
+      socket.on('connect_error', (error) => {
+        console.error('Socket connect error:', error.message);
+      });
+
       cleanup = () => {
         socket.off('connect');
         socket.off('newOrder');
@@ -107,7 +112,7 @@ export const initSocket = (
 
       console.log('Socket initialized with session:', sessionId);
     } catch (error) {
-      console.error('Error initializing socket:', error);
+      console.error('Error initializing socket:', error.message, error);
     }
   };
 

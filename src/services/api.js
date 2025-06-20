@@ -3,6 +3,7 @@ import axios from 'axios';
 const api = axios.create({
   baseURL: `${import.meta.env.VITE_API_URL || 'https://coffee-ordering-backend1-production.up.railway.app'}/api`,
   withCredentials: true,
+  timeout: 10000, // Add timeout to avoid hanging requests
 });
 
 api.interceptors.request.use(
@@ -27,7 +28,7 @@ api.interceptors.response.use(
   },
   (error) => {
     const message = error.response?.data?.error || error.message;
-    console.error(`[Error] ${error.config?.url}: ${message}`);
+    console.error(`[Error] ${error.config?.url}: ${message}`, error);
     return Promise.reject(error);
   }
 );
