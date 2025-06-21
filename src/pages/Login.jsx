@@ -22,9 +22,12 @@ function Login({ onLogin }) {
       const res = await api.post('/login', { email, password }, { withCredentials: true });
       const { user } = res.data;
       const sessionRes = await api.get('/session', { withCredentials: true });
-      const newSessionId = sessionRes.data.sessionId;
-      if (newSessionId) {
+      if (sessionRes.status === 200 && sessionRes.data && sessionRes.data.sessionId) {
+        const newSessionId = sessionRes.data.sessionId;
         localStorage.setItem('sessionId', newSessionId);
+      } else {
+        console.warn('Invalid session response:', sessionRes.data);
+        throw new Error('Session initialization failed');
       }
       toast.success('Logged in successfully');
       onLogin(user);
