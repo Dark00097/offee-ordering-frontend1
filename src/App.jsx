@@ -1,7 +1,7 @@
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
-import { login, logout, api } from './services/api';
+import { api } from './services/api';
 import { initSocket } from './services/socket';
 import Home from './pages/Home';
 import Login from './pages/Login';
@@ -40,7 +40,7 @@ function App() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [error, setError] = useState(null);
   const [latestOrderId, setLatestOrderId] = useState(null);
-  const [user, setUser] = useState(JSON.parse(localStorage.getItem('user')) || null);
+  const [user, setUser] = useState(null);
   const [socketCleanup, setSocketCleanup] = useState(null);
 
   const handleNewNotification = (notification) => {
@@ -52,7 +52,7 @@ function App() {
   };
 
   const initializeSocket = () => {
-    if (user) {
+    if (user) { // Only initialize socket for authenticated users
       const cleanup = initSocket(
         () => {},
         () => {},
@@ -73,11 +73,10 @@ function App() {
           try {
             const res = await api.get('/check-auth');
             setUser(res.data);
-            if (res.data) initializeSocket();
           } catch (err) {
             setUser(null);
             if (window.location.pathname.startsWith('/admin') || window.location.pathname.startsWith('/staff')) {
-              navigate('/login');
+              navigate('/login'); // Redirect to login for protected routes
             }
           }
         };
@@ -93,6 +92,7 @@ function App() {
         };
 
         await Promise.all([checkAuth(), fetchPromotions()]);
+        initializeSocket();
       } catch (error) {
         console.error('Error initializing app:', error);
       }
@@ -103,24 +103,26 @@ function App() {
     return () => {
       if (socketCleanup) socketCleanup();
     };
-  }, []);
+  }, [user]); // Re-run when user changes
 
-  const handleLogin = async (email, password) => {
-    try {
-      const data = await login(email, password);
-      setUser(data.user);
-      if (data.user.role === 'admin') navigate('/admin');
-      else if (data.user.role === 'server') navigate('/staff');
-      initializeSocket();
-    } catch (error) {
-      toast.error('Login failed');
-      setUser(null);
-    }
+  const handleLogin = async (user) => {
+    setUser(user);
+    const cleanup = reinitializeSocket({
+      onNewOrder: () => {},
+      onOrderUpdate: () => {},
+      onTableStatusUpdate: () => {},
+      onReservationUpdate: () => {},
+      onRatingUpdate: () => {},
+      onOrderApproved: () => {},
+      onNewNotification: handleNewNotification,
+    });
+    setSocketCleanup(() => cleanup);
+    navigate(user.role === 'admin' ? '/admin' : '/staff');
   };
 
   const handleLogout = async () => {
     try {
-      await logout();
+      await api.post('/logout');
       setUser(null);
       setCart([]);
       setDeliveryAddress('');

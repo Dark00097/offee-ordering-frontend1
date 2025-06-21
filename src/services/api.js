@@ -3,20 +3,11 @@ import axios from 'axios';
 const api = axios.create({
   baseURL: `${import.meta.env.VITE_API_URL || 'https://coffee-ordering-backend1-production.up.railway.app'}/api`,
   withCredentials: true,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
-    if (token) config.headers.Authorization = `Bearer ${token}`;
-    console.log(`[${config.method.toUpperCase()}] ${config.url}`, {
-      withCredentials: config.withCredentials,
-      headers: config.headers,
-      cookies: document.cookie || 'No cookie in document.cookie',
-    });
+    console.log(`[${config.method.toUpperCase()}] ${config.url}`);
     return config;
   },
   (error) => {
@@ -37,7 +28,7 @@ api.interceptors.response.use(
   }
 );
 
-// API methods
+// API methods (same as localhost)
 api.getNotifications = (params) => api.get('/notifications', { params });
 api.markNotificationRead = (id) => api.put(`/notifications/${id}/read`);
 api.clearNotifications = () => api.put('/notifications/clear');
