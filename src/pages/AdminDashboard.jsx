@@ -102,6 +102,12 @@ function AdminDashboard() {
   useEffect(() => {
     async function checkAuth() {
       try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          toast.error('Please log in');
+          navigate('/login');
+          return;
+        }
         const res = await api.get('/check-auth');
         if (res.data.role !== 'admin') {
           toast.error('Admin access required');
@@ -158,9 +164,88 @@ function AdminDashboard() {
         });
         toast.info(`Order #${updatedOrder.orderId} updated to ${updatedOrder.approved ? 'Approved' : 'Not Approved'}`);
       },
-      () => {},
-      () => {},
-      () => {}
+      (approvedOrder) => {
+        setAnalyticsData((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            recentOrders: prev.recentOrders.map((o) => (o.id === parseInt(approvedOrder.orderId) ? { ...o, approved: 1 } : o)),
+            totalRevenue: {
+              ...prev.totalRevenue,
+              revenue: (parseFloat(prev.totalRevenue.revenue) + parseFloat(approvedOrder.total_price || 0)).toFixed(2),
+            },
+          };
+        });
+        toast.success(`Order #${approvedOrder.orderId} approved`);
+      },
+      (deletedOrder) => {
+        setAnalyticsData((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            recentOrders: prev.recentOrders.filter((o) => o.id !== parseInt(deletedOrder.orderId)),
+            totalOrders: { ...prev.totalOrders, count: Math.max(0, prev.totalOrders.count - 1) },
+          };
+        });
+        toast.info(`Order #${deletedOrder.orderId} deleted`);
+      },
+      (reservation) => {
+        setAnalyticsData((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            reservationStatus: {
+              ...prev.reservationStatus,
+              reservations: [reservation, ...prev.reservationStatus.reservations.slice(0, 4)],
+            },
+          };
+        });
+        toast.success(`New reservation #${reservation.id} created`);
+      },
+      (updatedReservation) => {
+        setAnalyticsData((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            reservationStatus: {
+              ...prev.reservationStatus,
+              reservations: prev.reservationStatus.reservations.map((r) =>
+                r.id === parseInt(updatedReservation.reservationId) ? { ...r, status: updatedReservation.status } : r
+              ),
+            },
+          };
+        });
+        toast.info(`Reservation #${updatedReservation.reservationId} updated to ${updatedReservation.status}`);
+      },
+      (notification) => {
+        toast.info(notification.message, { autoClose: 5000 });
+      },
+      (banner) => {
+        toast.success(`New banner #${banner.id} created`);
+      },
+      (updatedBanner) => {
+        toast.info(`Banner #${updatedBanner.id} updated`);
+      },
+      (deletedBanner) => {
+        toast.info(`Banner #${deletedBanner.id} deleted`);
+      },
+      () => {
+        toast.info('Notifications cleared');
+        setAnalyticsData((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            recentOrders: prev.recentOrders.map((o) => ({ ...o, notification: false })),
+          };
+        });
+      },
+      (analytics) => {
+        setAnalyticsData((prev) => ({
+          ...prev,
+          ...analytics,
+        }));
+        toast.info('Analytics data updated');
+      }
     );
 
     return () => {
@@ -214,7 +299,7 @@ function AdminDashboard() {
       return;
     }
     await fetchAnalyticsData();
-    toast.success('Dashboard updated with selected filters');
+    toast0success('Dashboard updated with selected filters');
   };
 
   const handleResetFilters = () => {
@@ -412,7 +497,7 @@ function AdminDashboard() {
           backgroundColor: themeColors.tooltipBg,
           borderColor: themeColors.borderColor,
           borderWidth: 1,
-          cornerRadius: 12,
+         角落Radius: 12,
         },
       },
       scales: {

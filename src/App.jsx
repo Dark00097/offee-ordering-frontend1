@@ -56,32 +56,13 @@ function App() {
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        // Initialize session
-        const response = await api.get('/session');
-        const serverSessionId = response.data.sessionId;
-        if (serverSessionId) {
-          setSessionId(serverSessionId);
-          localStorage.setItem('sessionId', serverSessionId);
-          api.defaults.headers.common['X-Session-Id'] = serverSessionId;
-        } else {
-          const fallbackSessionId = localStorage.getItem('sessionId') || `guest-${uuidv4()}`;
-          setSessionId(fallbackSessionId);
-          localStorage.setItem('sessionId', fallbackSessionId);
-          api.defaults.headers.common['X-Session-Id'] = fallbackSessionId;
+        // Initialize session for guests
+        let localSessionId = localStorage.getItem('sessionId');
+        if (!localSessionId) {
+          localSessionId = `guest-${uuidv4()}`;
+          localStorage.setItem('sessionId', localSessionId);
         }
-
-        // Check authentication
-        const checkAuth = async () => {
-          try {
-            const res = await api.get('/check-auth');
-            setUser(res.data);
-          } catch (err) {
-            setUser(null);
-            if (window.location.pathname.startsWith('/admin') || window.location.pathname.startsWith('/staff')) {
-              navigate('/login');
-            }
-          }
-        };
+        setSessionId(localSessionId);
 
         // Fetch promotions
         const fetchPromotions = async () => {
@@ -94,27 +75,35 @@ function App() {
           }
         };
 
-        await Promise.all([checkAuth(), fetchPromotions()]);
+        // Check authentication for staff/admin
+        const checkAuth = async () => {
+          try {
+            const res = await api.get('/check-auth');
+            setUser(res.data);
+            const cleanup = initSocket(
+              () => {},
+              () => {},
+              () => {},
+              () => {},
+              () => {},
+              () => {},
+              handleNewNotification
+            );
+            setSocketCleanup(() => cleanup);
+          } catch (err) {
+            setUser(null);
+            if (window.location.pathname.startsWith('/admin') || window.location.pathname.startsWith('/staff')) {
+              navigate('/login');
+            }
+          }
+        };
 
-        // Initialize socket for authenticated users
-        if (user) {
-          const cleanup = initSocket(
-            () => {},
-            () => {},
-            () => {},
-            () => {},
-            () => {},
-            () => {},
-            handleNewNotification
-          );
-          setSocketCleanup(() => cleanup);
-        }
+        await Promise.all([fetchPromotions(), checkAuth()]);
       } catch (error) {
         console.error('Error initializing app:', error);
         const fallbackSessionId = localStorage.getItem('sessionId') || `guest-${uuidv4()}`;
         setSessionId(fallbackSessionId);
         localStorage.setItem('sessionId', fallbackSessionId);
-        api.defaults.headers.common['X-Session-Id'] = fallbackSessionId;
       }
     };
 
@@ -123,10 +112,11 @@ function App() {
     return () => {
       if (socketCleanup) socketCleanup();
     };
-  }, [user, navigate]);
+  }, [navigate]);
 
-  const handleLogin = async (user) => {
+  const handleLogin = async (user, token) => {
     setUser(user);
+    localStorage.setItem('token', token);
     const cleanup = initSocket(
       () => {},
       () => {},
@@ -148,7 +138,9 @@ function App() {
       setDeliveryAddress('');
       setPromotionId('');
       setIsCartOpen(false);
+      localStorage.removeItem('token');
       if (socketCleanup) socketCleanup();
+      setSocketCleanup(null);
       toast.success('Successfully logged out');
       navigate('/');
     } catch (error) {

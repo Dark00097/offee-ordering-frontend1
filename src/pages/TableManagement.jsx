@@ -295,14 +295,23 @@ function TableManagement() {
 
     const checkAuth = async () => {
       try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          toast.error('Please log in');
+          navigate('/login');
+          return;
+        }
         const res = await api.get('/check-auth');
-        if (res.data.role !== 'admin') {
+        if (!res.data?.id || res.data.role !== 'admin') {
           toast.error('Admin access required');
-          navigate('/');
-        } else {
-          setUser(res.data);
-          // Initialize Socket.IO after user is confirmed
-          socketCleanup = initSocket({
+          localStorage.removeItem('token');
+          navigate('/login');
+          return;
+        }
+        setUser(res.data);
+        // Initialize Socket.IO after user is confirmed
+        socketCleanup = initSocket(
+          {
             onTableStatusUpdate: (data) => {
               setTables((prevTables) =>
                 prevTables.map((table) =>
@@ -310,25 +319,47 @@ function TableManagement() {
                 )
               );
               toast.info(`Table ${data.table_id} status updated to ${data.status}`);
+            },
+            onDisconnect: () => {
+              console.warn('Socket disconnected');
             }
-          });
-        }
+          },
+          { token } // Pass token for socket authentication
+        );
       } catch (err) {
-        console.error('Auth check failed:', err);
-        toast.error(err.response?.data?.error || 'Please log in');
-        navigate('/login');
-      } finally {
-        setIsLoading(false);
+        console.error('Auth check failed:', err.response?.data || err.message);
+        if (err.response?.status === 401) {
+          toast.error('Session expired. Please log in again.');
+          localStorage.removeItem('token');
+          navigate('/login');
+        } else {
+          toast.error(err.response?.data?.error || 'Authentication failed');
+          navigate('/login');
+        }
       }
     };
 
     const fetchData = async () => {
       try {
-        const res = await api.getTables();
+        const token = localStorage.getItem('token');
+        if (!token) {
+          toast.error('Please log in');
+          navigate('/login');
+          return;
+        }
+        const res = await api.get('/tables');
         setTables(res.data || []);
       } catch (error) {
-        console.error('Error fetching tables:', error);
-        toast.error(error.response?.data?.error || 'Failed to fetch tables');
+        console.error('Error fetching tables:', error.response?.data || error.message);
+        if (error.response?.status === 401) {
+          toast.error('Session expired. Please log in again.');
+          localStorage.removeItem('token');
+          navigate('/login');
+        } else {
+          toast.error(error.response?.data?.error || 'Failed to fetch tables');
+        }
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -348,6 +379,12 @@ function TableManagement() {
         navigate('/login');
         return;
       }
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Please log in');
+        navigate('/login');
+        return;
+      }
       if (!newTable.table_number.trim() || !newTable.capacity) {
         toast.error('Table number and capacity are required');
         return;
@@ -357,15 +394,21 @@ function TableManagement() {
         toast.error('Capacity must be a positive number');
         return;
       }
-      await api.addTable({ user_id: user.id, ...newTable });
+      await api.post('/tables', { user_id: user.id, ...newTable });
       toast.success('Table added successfully');
       setNewTable({ table_number: '', capacity: '' });
       setShowAddForm(false);
-      const res = await api.getTables();
+      const res = await api.get('/tables');
       setTables(res.data || []);
     } catch (error) {
-      console.error('Error adding table:', error);
-      toast.error(error.response?.data?.error || 'Failed to add table');
+      console.error('Error adding table:', error.response?.data || error.message);
+      if (error.response?.status === 401) {
+        toast.error('Session expired. Please log in again.');
+        localStorage.removeItem('token');
+        navigate('/login');
+      } else {
+        toast.error(error.response?.data?.error || 'Failed to add table');
+      }
     }
   };
 
@@ -374,6 +417,12 @@ function TableManagement() {
     try {
       if (!user || user.role !== 'admin') {
         toast.error('Admin access required');
+        navigate('/login');
+        return;
+      }
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Please log in');
         navigate('/login');
         return;
       }
@@ -386,7 +435,7 @@ function TableManagement() {
         toast.error('Capacity must be a positive number');
         return;
       }
-      await api.updateTable(editTable.id, {
+      await api.put(`/tables/${editTable.id}`, {
         user_id: user.id,
         table_number: editTable.table_number,
         capacity,
@@ -395,11 +444,17 @@ function TableManagement() {
       });
       toast.success('Table updated successfully');
       setEditTable(null);
-      const res = await api.getTables();
+      const res = await api.get('/tables');
       setTables(res.data || []);
     } catch (error) {
-      console.error('Error updating table:', error);
-      toast.error(error.response?.data?.error || 'Failed to update table');
+      console.error('Error updating table:', error.response?.data || error.message);
+      if (error.response?.status === 401) {
+        toast.error('Session expired. Please log in again.');
+        localStorage.removeItem('token');
+        navigate('/login');
+      } else {
+        toast.error(error.response?.data?.error || 'Failed to update table');
+      }
     }
   };
 
@@ -413,13 +468,25 @@ function TableManagement() {
         navigate('/login');
         return;
       }
-      await api.deleteTable(id, { user_id: user.id });
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Please log in');
+        navigate('/login');
+        return;
+      }
+      await api.delete(`/tables/${id}`, { data: { user_id: user.id } });
       toast.success('Table deleted successfully');
-      const res = await api.getTables();
+      const res = await api.get('/tables');
       setTables(res.data || []);
     } catch (error) {
-      console.error('Error deleting table:', error);
-      toast.error(error.response?.data?.error || 'Failed to delete table');
+      console.error('Error deleting table:', error.response?.data || error.message);
+      if (error.response?.status === 401) {
+        toast.error('Session expired. Please log in again.');
+        localStorage.removeItem('token');
+        navigate('/login');
+      } else {
+        toast.error(error.response?.data?.error || 'Failed to delete table');
+      }
     }
   };
 

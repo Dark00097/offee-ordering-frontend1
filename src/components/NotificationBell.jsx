@@ -5,6 +5,7 @@ import {
   Popover,
   List,
   ListItem,
+  ListItemButton,
   ListItemText,
   ListItemIcon,
   Typography,
@@ -13,7 +14,7 @@ import {
   CircularProgress,
   Button,
 } from '@mui/material';
-import { Notifications as NotificationsIcon, Receipt, TableBar, CheckCircle } from '@mui/icons-material';
+import { Notifications as NotificationsIcon, Receipt as OrderIcon, TableBar as TableIcon, CheckCircle as CheckIcon } from '@mui/icons-material';
 import { api } from '../services/api';
 import { toast } from 'react-toastify';
 
@@ -169,8 +170,12 @@ function NotificationBell({ user, navigate, notifications, handleNewNotification
 
   const handleNotificationClick = async (notification) => {
     try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Please log in');
+      }
       if (!notification.is_read) {
-        await api.markNotificationRead(notification.id);
+        await api.put(`/notifications/${notification.id}/read`);
         handleNewNotification({ ...notification, is_read: 1 });
       }
       handleClose();
@@ -184,22 +189,38 @@ function NotificationBell({ user, navigate, notifications, handleNewNotification
         navigate(`/reservation/${notification.reference_id}`);
       }
     } catch (err) {
-      console.error('Error processing notification:', err);
-      toast.error('Failed to process notification');
+      console.error('Error processing notification:', err.response?.data || err.message);
+      if (err.response?.status === 401 || err.message === 'Please log in') {
+        toast.error('Session expired. Please log in again.');
+        localStorage.removeItem('token');
+        navigate('/login');
+      } else {
+        toast.error(err.response?.data?.error || 'Failed to process notification');
+      }
     }
   };
 
   const handleClearNotifications = async () => {
     try {
       setIsLoading(true);
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Please log in');
+      }
       const unreadNotifications = notifications.filter((n) => !n.is_read);
       for (const notification of unreadNotifications) {
-        await api.markNotificationRead(notification.id);
+        await api.put(`/notifications/${notification.id}/read`);
         handleNewNotification({ ...notification, is_read: 1 });
       }
     } catch (err) {
-      console.error('Error clearing notifications:', err);
-      toast.error('Failed to clear notifications');
+      console.error('Error clearing notifications:', err.response?.data || err.message);
+      if (err.response?.status === 401 || err.message === 'Please log in') {
+        toast.error('Session expired. Please log in again.');
+        localStorage.removeItem('token');
+        navigate('/login');
+      } else {
+        toast.error(err.response?.data?.error || 'Failed to clear notifications');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -250,7 +271,7 @@ function NotificationBell({ user, navigate, notifications, handleNewNotification
             {notifications.map((notification) => {
               const isUnread = !notification.is_read;
               return (
-                <ListItem
+                <ListItemButton
                   key={notification.id}
                   onClick={() => handleNotificationClick(notification)}
                   sx={{
@@ -260,9 +281,9 @@ function NotificationBell({ user, navigate, notifications, handleNewNotification
                 >
                   <ListItemIcon>
                     {notification.type === 'order' ? (
-                      <Receipt sx={notificationStyles.icon} />
+                      <OrderIcon sx={notificationStyles.icon} />
                     ) : (
-                      <TableBar sx={notificationStyles.icon} />
+                      <TableIcon sx={notificationStyles.icon} />
                     )}
                   </ListItemIcon>
                   <ListItemText
@@ -273,8 +294,8 @@ function NotificationBell({ user, navigate, notifications, handleNewNotification
                       </Typography>
                     }
                   />
-                  {isUnread && <CheckCircle sx={{ color: '#2563eb', fontSize: 16 }} />}
-                </ListItem>
+                  {isUnread && <CheckIcon sx={{ color: '#2563eb', fontSize: 16 }} />}
+                </ListItemButton>
               );
             })}
           </List>

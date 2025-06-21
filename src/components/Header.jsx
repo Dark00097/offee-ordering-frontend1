@@ -1,4 +1,3 @@
-// src/components/Header.jsx
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { initSocket } from '../services/socket';
@@ -221,7 +220,7 @@ const Header = memo(
       { to: '/admin/add-menu-item', label: 'Add Menu Item', icon: <AddCircleOutlineIcon /> },
       { to: '/admin/manage-menu-items', label: 'Menu Items', icon: <RestaurantIcon /> },
       { to: '/admin/supplements', label: 'Manage Supplements', icon: <RestaurantIcon /> },
-      { to: '/admin/breakfasts', label: 'Breakfasts', icon: <CafeIcon /> }, // Added link
+      { to: '/admin/breakfasts', label: 'Breakfasts', icon: <CafeIcon /> },
       { to: '/admin/promotions', label: 'Promotions', icon: <PromotionIcon /> },
       { to: '/admin/users', label: 'Staff Management', icon: <GroupIcon /> },
       { to: '/admin/tables', label: 'Table Management', icon: <TableIcon /> },
@@ -247,7 +246,11 @@ const Header = memo(
 
     const fetchNotifications = async () => {
       try {
-        const res = await api.getNotifications({ is_read: 0 });
+        const token = localStorage.getItem('token');
+        if (!token) {
+          throw new Error('Please log in');
+        }
+        const res = await api.get('/notifications', { params: { is_read: 0 } });
         setNotifications(
           res.data.map((n) => ({
             ...n,
@@ -256,8 +259,14 @@ const Header = memo(
           }))
         );
       } catch (err) {
-        console.error('Error fetching notifications:', err);
-        toast.error('Failed to load notifications');
+        console.error('Error fetching notifications:', err.response?.data || err.message);
+        if (err.response?.status === 401 || err.message === 'Please log in') {
+          toast.error('Session expired. Please log in again.');
+          localStorage.removeItem('token');
+          navigate('/login');
+        } else {
+          toast.error(err.response?.data?.error || 'Failed to load notifications');
+        }
       }
     };
 
@@ -308,6 +317,33 @@ const Header = memo(
       debouncedSearch(searchQuery);
     };
 
+    const handleLogoutClick = useCallback(async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          toast.error('Please log in');
+          navigate('/login');
+          return;
+        }
+        await api.post('/logout');
+        localStorage.removeItem('token');
+        handleLogout();
+        toast.success('Logged out successfully');
+        navigate('/login');
+      } catch (err) {
+        console.error('Error during logout:', err.response?.data || err.message);
+        if (err.response?.status === 401) {
+          toast.error('Session expired. Please log in again.');
+          localStorage.removeItem('token');
+          navigate('/login');
+        } else {
+          toast.error(err.response?.data?.error || 'Failed to log out');
+        }
+        handleLogout();
+        navigate('/login');
+      }
+    }, [handleLogout, navigate]);
+
     useEffect(() => {
       let mounted = true;
 
@@ -317,46 +353,76 @@ const Header = memo(
           if (mounted) setCategories(res.data || []);
         } catch (error) {
           if (mounted) {
-            toast.error(error.response?.data?.error || 'Failed to fetch categories');
-            setCategories([]);
+            console.error('Error fetching categories:', error.response?.data || error.message);
+            if (error.response?.status === 401) {
+              toast.error('Session expired. Please log in again.');
+              localStorage.removeItem('token');
+              navigate('/login');
+            } else {
+              toast.error(error.response?.data?.error || 'Failed to fetch categories');
+              setCategories([]);
+            }
           }
         }
       };
 
-      if (!user || !['admin', 'server'].includes(user?.role)) fetchCategories();
-
-      if (['admin', 'server'].includes(user?.role)) {
-        fetchNotifications();
-        let cleanup = () => {};
-
-        const setupSocket = async () => {
-          try {
-            cleanup = await initSocket(
-              () => {},
-              () => {},
-              () => {},
-              () => {},
-              () => {},
-              () => {},
-              handleNewNotification
-            );
-          } catch (err) {
-            console.error('Socket initialization failed:', err);
-            toast.error('Failed to connect to real-time updates');
+      const setupSocketAndFetch = async () => {
+        try {
+          const token = localStorage.getItem('token');
+          if (!token && ['admin', 'server'].includes(user?.role)) {
+            toast.error('Please log in');
+            localStorage.removeItem('token');
+            navigate('/login');
+            return;
           }
-        };
+          if (!user || !['admin', 'server'].includes(user?.role)) {
+            await fetchCategories();
+            return;
+          }
 
-        setupSocket();
-        return () => {
-          mounted = false;
-          if (typeof cleanup === 'function') cleanup();
-        };
-      }
+          await fetchNotifications();
+
+          return initSocket(
+            {
+              onNewOrder: () => {},
+              onOrderUpdate: () => {},
+              onOrderApproved: () => {},
+              onTableStatusUpdate: () => {},
+              onTableReservationUpdate: () => {},
+              onTableReservationApproved: () => {},
+              onNewNotification: handleNewNotification,
+              onDisconnect: () => {
+                console.warn('Socket disconnected');
+                toast.warn('Disconnected from real-time updates');
+              },
+            },
+            { token } // Pass token for socket authentication
+          );
+        } catch (err) {
+          console.error('Setup failed:', err.response?.data || err.message);
+          if (err.response?.status === 401 || err.message === 'Please log in') {
+            toast.error('Session expired. Please log in again.');
+            localStorage.removeItem('token');
+            navigate('/login');
+          } else {
+            toast.error(err.response?.data?.error || 'Failed to initialize header');
+          }
+        }
+      };
+
+      setupSocketAndFetch().then((cleanup) => {
+        if (mounted && typeof cleanup === 'function') {
+          return () => {
+            cleanup();
+            mounted = false;
+          };
+        }
+      });
 
       return () => {
         mounted = false;
       };
-    }, [user, handleNewNotification]);
+    }, [user, handleNewNotification, navigate]);
 
     const renderDesktopNavItems = useCallback(() => {
       const links = user?.role === 'admin' ? adminLinks : user?.role === 'server' ? staffLinks : publicLinks.slice(0, 4);
@@ -481,7 +547,7 @@ const Header = memo(
                     {user.name || 'User'}
                   </Typography>
                   <Chip
-                    label={`${user.role.charAt(0).toUpperCase() + user.role.slice(1)} Account`}
+                    label={`${user.role.charAt(0).toUpperCase() + user.role.slice(1, -1)} Account`}
                     size="small"
                     sx={{ backgroundColor: '#ffe0b2', color: '#ff9800', fontSize: '11px', fontWeight: 500 }}
                   />
@@ -493,7 +559,7 @@ const Header = memo(
                 fullWidth
                 variant="outlined"
                 startIcon={<LogoutIcon />}
-                onClick={handleLogout}
+                onClick={handleLogoutClick}
                 sx={{
                   borderRadius: '8px',
                   borderColor: '#e65100',
@@ -528,7 +594,7 @@ const Header = memo(
           </Box>
         </Box>
       );
-    }, [user, searchQuery, expandedSection, categories, handleLogout, navigate]);
+    }, [user, searchQuery, expandedSection, categories, handleLogoutClick, navigate]);
 
     return (
       <>

@@ -2,12 +2,20 @@ import axios from 'axios';
 
 const api = axios.create({
   baseURL: `${import.meta.env.VITE_API_URL || 'https://coffee-ordering-backend1-production.up.railway.app'}/api`,
-  withCredentials: true,
+  withCredentials: false,
 });
 
 api.interceptors.request.use(
   (config) => {
-    console.log(`[${config.method.toUpperCase()}] ${config.url}`, config.headers); // Log headers for debugging
+    const token = localStorage.getItem('token');
+    const sessionId = localStorage.getItem('sessionId');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    if (sessionId) {
+      config.headers['X-Session-Id'] = sessionId;
+    }
+    console.log(`[${config.method.toUpperCase()}] ${config.url}`, config.headers);
     return config;
   },
   (error) => {
@@ -18,12 +26,12 @@ api.interceptors.request.use(
 
 api.interceptors.response.use(
   (response) => {
-    console.log(`[Response] ${response.config.url}: ${response.status}`, response.headers); // Log headers for debugging
+    console.log(`[Response] ${response.config.url}: ${response.status}`, response.headers);
     return response;
   },
   (error) => {
     const message = error.response?.data?.error || error.message;
-    console.error(`[Error] ${error.config?.url}: ${message}`, error.response?.headers); // Log headers for debugging
+    console.error(`[Error] ${error.config?.url}: ${message}`, error.response?.headers);
     return Promise.reject(error);
   }
 );

@@ -22,7 +22,6 @@ function UserManagement() {
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
-  // Moved the useEffect for CSS styles into the component body
   useEffect(() => {
     const styleSheet = document.createElement('style');
     styleSheet.textContent = `
@@ -110,29 +109,54 @@ function UserManagement() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const res = await api.get('/check-auth');
-        if (res.data.role !== 'admin') {
-          toast.error('Admin access required');
+        const token = localStorage.getItem('token');
+        if (!token) {
+          toast.error('Please log in');
           navigate('/login');
-        } else {
-          setUser(res.data);
+          return;
         }
+        const res = await api.get('/check-auth');
+        if (!res.data?.id || res.data.role !== 'admin') {
+          toast.error('Admin access required');
+          localStorage.removeItem('token');
+          navigate('/login');
+          return;
+        }
+        setUser(res.data);
       } catch (err) {
         console.error('Auth check failed:', err.response?.data || err.message);
-        toast.error(err.response?.data?.error || 'Please log in');
-        navigate('/login');
-      } finally {
-        setIsLoading(false);
+        if (err.response?.status === 401) {
+          toast.error('Session expired. Please log in again.');
+          localStorage.removeItem('token');
+          navigate('/login');
+        } else {
+          toast.error(err.response?.data?.error || 'Authentication failed');
+          navigate('/login');
+        }
       }
     };
 
     const fetchUsers = async () => {
       try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          toast.error('Please log in');
+          navigate('/login');
+          return;
+        }
         const res = await api.get('/users');
         setUsers(res.data || []);
       } catch (err) {
         console.error('Failed to load users:', err.response?.data || err.message);
-        toast.error(err.response?.data?.error || 'Failed to load users');
+        if (err.response?.status === 401) {
+          toast.error('Session expired. Please log in again.');
+          localStorage.removeItem('token');
+          navigate('/login');
+        } else {
+          toast.error(err.response?.data?.error || 'Failed to load users');
+        }
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -142,11 +166,22 @@ function UserManagement() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.email.trim() || !form.password.trim()) {
-      toast.error('Email and password are required');
-      return;
-    }
     try {
+      if (!user || user.role !== 'admin') {
+        toast.error('Admin access required');
+        navigate('/login');
+        return;
+      }
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Please log in');
+        navigate('/login');
+        return;
+      }
+      if (!form.email.trim() || !form.password.trim()) {
+        toast.error('Email and password are required');
+        return;
+      }
       await api.post('/staff', { user_id: user.id, ...form });
       setForm({ email: '', password: '', role: 'server' });
       const res = await api.get('/users');
@@ -154,7 +189,13 @@ function UserManagement() {
       toast.success('Staff added successfully');
     } catch (err) {
       console.error('Failed to add user:', err.response?.data || err.message);
-      toast.error(err.response?.data?.error || 'Failed to add staff');
+      if (err.response?.status === 401) {
+        toast.error('Session expired. Please log in again.');
+        localStorage.removeItem('token');
+        navigate('/login');
+      } else {
+        toast.error(err.response?.data?.error || 'Failed to add staff');
+      }
     }
   };
 
@@ -164,32 +205,66 @@ function UserManagement() {
 
   const handleUpdate = async (e) => {
     e.preventDefault();
-    if (!editUser.email.trim()) {
-      toast.error('Email is required');
-      return;
-    }
     try {
-      await api.updateUser(editUser.id, { user_id: user.id, ...editUser });
+      if (!user || user.role !== 'admin') {
+        toast.error('Admin access required');
+        navigate('/login');
+        return;
+      }
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Please log in');
+        navigate('/login');
+        return;
+      }
+      if (!editUser.email.trim()) {
+        toast.error('Email is required');
+        return;
+      }
+      await api.put(`/users/${editUser.id}`, { user_id: user.id, ...editUser });
       setEditUser(null);
       const res = await api.get('/users');
       setUsers(res.data || []);
       toast.success('User updated successfully');
     } catch (err) {
       console.error('Failed to update user:', err.response?.data || err.message);
-      toast.error(err.response?.data?.error || 'Failed to update user');
+      if (err.response?.status === 401) {
+        toast.error('Session expired. Please log in again.');
+        localStorage.removeItem('token');
+        navigate('/login');
+      } else {
+        toast.error(err.response?.data?.error || 'Failed to update user');
+      }
     }
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm('Are you sure you want to delete this user?')) return;
     try {
-      await api.deleteUser(id, { user_id: user.id });
+      if (!user || user.role !== 'admin') {
+        toast.error('Admin access required');
+        navigate('/login');
+        return;
+      }
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Please log in');
+        navigate('/login');
+        return;
+      }
+      await api.delete(`/users/${id}`, { data: { user_id: user.id } });
       const res = await api.get('/users');
       setUsers(res.data || []);
       toast.success('User deleted successfully');
     } catch (err) {
       console.error('Failed to delete user:', err.response?.data || err.message);
-      toast.error(err.response?.data?.error || 'Failed to delete user');
+      if (err.response?.status === 401) {
+        toast.error('Session expired. Please log in again.');
+        localStorage.removeItem('token');
+        navigate('/login');
+      } else {
+        toast.error(err.response?.data?.error || 'Failed to delete user');
+      }
     }
   };
 
@@ -206,12 +281,12 @@ function UserManagement() {
     <div style={styles.container}>
       {/* Header */}
       <div style={styles.header}>
-        <div style={styles.headerContent}>
+        <div style={styles.headerContent} className="user-management-header-content">
           <div style={styles.headerIcon}>
             <PeopleIcon style={{ fontSize: 32, color: '#4f46e5' }} />
           </div>
           <div>
-            <h1 style={styles.title}>User Management</h1>
+            <h1 style={styles.title} className="user-management-title">User Management</h1>
             <p style={styles.subtitle}>Manage your restaurant staff and administrators</p>
           </div>
         </div>

@@ -12,28 +12,47 @@ function OrderManagement() {
   const [showOrderDetail, setShowOrderDetail] = useState(false);
   const [dateFilter, setDateFilter] = useState('all');
   const navigate = useNavigate();
-  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  const baseUrl = import.meta.env.VITE_API_URL || 'https://coffee-ordering-backend1-production.up.railway.app';
   const placeholderImage = 'https://via.placeholder.com/48?text=No+Image';
 
   useEffect(() => {
     async function checkAuth() {
       try {
-        const res = await api.get('/check-auth');
-        if (res.data.role !== 'admin') {
-          toast.error('Admin access required');
+        const token = localStorage.getItem('token');
+        if (!token) {
+          toast.error('Please log in');
           navigate('/login');
-        } else {
-          setUser(res.data);
+          return;
         }
+        const res = await api.get('/check-auth');
+        if (!res.data?.id || res.data.role !== 'admin') {
+          toast.error('Admin access required');
+          localStorage.removeItem('token');
+          navigate('/login');
+          return;
+        }
+        setUser(res.data);
       } catch (err) {
         console.error('Auth check failed:', err.response?.data || err.message);
-        toast.error(err.response?.data?.error || 'Please log in');
-        navigate('/login');
+        if (err.response?.status === 401) {
+          toast.error('Session expired. Please log in again.');
+          localStorage.removeItem('token');
+          navigate('/login');
+        } else {
+          toast.error(err.response?.data?.error || 'Authentication failed');
+          navigate('/login');
+        }
       }
     }
 
     async function fetchOrders() {
       try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          toast.error('Please log in');
+          navigate('/login');
+          return;
+        }
         const query = dateFilter !== 'all' ? `?time_range=${dateFilter}` : '';
         const res = await api.get(`/orders${query}`);
         const processedOrders = (res.data || []).map(order => ({
@@ -46,7 +65,13 @@ function OrderManagement() {
         setOrders(processedOrders);
       } catch (err) {
         console.error('Failed to load orders:', err.response?.data || err.message);
-        toast.error(err.response?.data?.error || 'Failed to load orders');
+        if (err.response?.status === 401) {
+          toast.error('Session expired. Please log in again.');
+          localStorage.removeItem('token');
+          navigate('/login');
+        } else {
+          toast.error(err.response?.data?.error || 'Failed to load orders');
+        }
       } finally {
         setIsLoading(false);
       }
@@ -54,6 +79,13 @@ function OrderManagement() {
 
     checkAuth();
     fetchOrders();
+
+    const token = localStorage.getItem('token');
+    if (!token) {
+      toast.error('Please log in');
+      navigate('/login');
+      return;
+    }
 
     const socketCleanup = initSocket(
       (order) => {
@@ -78,8 +110,11 @@ function OrderManagement() {
         toast.info(`Order #${updatedOrder.orderId} updated to ${updatedOrder.status || (updatedOrder.approved ? 'Approved' : 'Pending')}`);
       },
       () => {},
+      () => {
+        console.warn('Socket disconnected');
+      },
       () => {},
-      () => {}
+      { token } // Pass token for socket authentication
     );
 
     return () => {
@@ -90,7 +125,18 @@ function OrderManagement() {
   }, [navigate, dateFilter]);
 
   const handleStatusUpdate = async (orderId, status) => {
+    if (!user) {
+      toast.error('You must be logged in to update orders');
+      navigate('/login');
+      return;
+    }
     try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Please log in');
+        navigate('/login');
+        return;
+      }
       const approved = status === 'Approved' ? 1 : 0;
       await api.post(`/orders/${orderId}/approve`, { user_id: user.id, approved });
       setOrders(prev =>
@@ -101,7 +147,13 @@ function OrderManagement() {
       toast.success('Order status updated successfully');
     } catch (err) {
       console.error('Failed to update order:', err.response?.data || err.message);
-      toast.error(err.response?.data?.error || 'Failed to update order status');
+      if (err.response?.status === 401) {
+        toast.error('Session expired. Please log in again.');
+        localStorage.removeItem('token');
+        navigate('/login');
+      } else {
+        toast.error(err.response?.data?.error || 'Failed to update order status');
+      }
     }
   };
 

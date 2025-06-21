@@ -48,7 +48,7 @@ function ManageMenuItems() {
   const navigate = useNavigate();
 
   // Base URL for images
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://coffee-ordering-backend1-production.up.railway.app';
 
   // CSS Styles
   const styles = {
@@ -408,14 +408,24 @@ function ManageMenuItems() {
     const initializeData = async () => {
       try {
         setIsLoading(true);
+        const token = localStorage.getItem('token');
+        if (!token) {
+          toast.error('Please log in');
+          navigate('/login');
+          return;
+        }
+
+        // Check authentication
         const authRes = await api.get('/check-auth');
         if (!authRes.data?.id || authRes.data.role !== 'admin') {
           toast.error('Admin access required');
+          localStorage.removeItem('token');
           navigate('/login');
           return;
         }
         setUser(authRes.data);
 
+        // Fetch menu items, categories, and supplements
         const [menuRes, catRes, supRes] = await Promise.all([
           api.get('/menu-items'),
           api.get('/categories'),
@@ -427,8 +437,13 @@ function ManageMenuItems() {
         setSupplements(supRes.data || []);
       } catch (error) {
         console.error('Initialization error:', error);
-        toast.error(error.response?.data?.error || 'Failed to load data');
-        navigate('/login');
+        if (error.response?.status === 401) {
+          toast.error('Session expired. Please log in again.');
+          localStorage.removeItem('token');
+          navigate('/login');
+        } else {
+          toast.error(error.response?.data?.error || 'Failed to load data');
+        }
       } finally {
         setIsLoading(false);
       }
@@ -456,6 +471,13 @@ function ManageMenuItems() {
 
   const handleEdit = async (item) => {
     try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Please log in');
+        navigate('/login');
+        return;
+      }
+
       const supRes = await api.get(`/menu-items/${item.id}/supplements`);
       const regularPriceValue = parseFloat(item.regular_price);
       const salePriceValue = item.sale_price !== null ? parseFloat(item.sale_price) : '';
@@ -479,7 +501,13 @@ function ManageMenuItems() {
       setNewSupplementId('');
     } catch (error) {
       console.error('Error fetching supplements:', error);
-      toast.error('Failed to load supplement data');
+      if (error.response?.status === 401) {
+        toast.error('Session expired. Please log in again.');
+        localStorage.removeItem('token');
+        navigate('/login');
+      } else {
+        toast.error(error.response?.data?.error || 'Failed to load supplement data');
+      }
     }
   };
 
@@ -512,7 +540,7 @@ function ManageMenuItems() {
     });
   };
 
-  const handleAddSupplement = () => {
+  const handleAddSupplement = async () => {
     if (!newSupplementId) {
       toast.error('Please select a supplement');
       return;
@@ -526,30 +554,65 @@ function ManageMenuItems() {
       toast.warn('Supplement already assigned');
       return;
     }
-    setEditingItem(prev => {
-      if (!prev) return null;
-      return {
-        ...prev,
-        assignedSupplements: [
-          ...prev.assignedSupplements,
-          {
-            supplement_id: supplement.id,
-            name: supplement.name,
-            additional_price: parseFloat(supplement.price) || 0,
-          },
-        ],
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Please log in');
+        navigate('/login');
+        return;
+      }
+      setIsSubmitting(true);
+      const supPayload = {
+        user_id: user.id,
+        name: supplement.name,
+        additional_price: parseFloat(supplement.price) || 0,
+        supplement_id: supplement.id,
       };
-    });
-    setNewSupplementId('');
+      await api.addSupplementToMenuItem(editingItem.id, supPayload);
+      setEditingItem(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          assignedSupplements: [
+            ...prev.assignedSupplements,
+            {
+              supplement_id: supplement.id,
+              name: supplement.name,
+              additional_price: parseFloat(supplement.price) || 0,
+            },
+          ],
+        };
+      });
+      setNewSupplementId('');
+      toast.success('Supplement added successfully');
+    } catch (error) {
+      console.error('Error adding supplement:', error);
+      if (error.response?.status === 401) {
+        toast.error('Session expired. Please log in again.');
+        localStorage.removeItem('token');
+        navigate('/login');
+      } else {
+        toast.error(error.response?.data?.error || 'Failed to add supplement');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleRemoveSupplement = async (supplementId) => {
     if (!user) {
       toast.error('You must be logged in to remove supplements');
+      navigate('/login');
       return;
     }
     if (!window.confirm('Remove this supplement from the menu item?')) return;
     try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Please log in');
+        navigate('/login');
+        return;
+      }
       setIsSubmitting(true);
       await api.deleteSupplementFromMenuItem(editingItem.id, supplementId, { user_id: user.id });
       setEditingItem(prev => {
@@ -564,7 +627,13 @@ function ManageMenuItems() {
       toast.success('Supplement removed');
     } catch (error) {
       console.error('Error removing supplement:', error);
-      toast.error(error.response?.data?.error || 'Failed to remove supplement');
+      if (error.response?.status === 401) {
+        toast.error('Session expired. Please log in again.');
+        localStorage.removeItem('token');
+        navigate('/login');
+      } else {
+        toast.error(error.response?.data?.error || 'Failed to remove supplement');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -578,6 +647,7 @@ function ManageMenuItems() {
     }
     if (!user || !user.id) {
       toast.error('User not authenticated');
+      navigate('/login');
       return;
     }
     if (!editingItem) {
@@ -587,6 +657,12 @@ function ManageMenuItems() {
 
     try {
       setIsSubmitting(true);
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Please log in');
+        navigate('/login');
+        return;
+      }
 
       // Validate inputs
       const itemId = parseInt(editingItem.id);
@@ -686,11 +762,17 @@ function ManageMenuItems() {
       setMenuItems(res.data || []);
     } catch (error) {
       console.error('Update error:', error);
-      const serverErrors = error.response?.data?.errors;
-      if (serverErrors?.length) {
-        serverErrors.forEach(err => toast.error(`Validation error: ${err.msg} (${err.path})`));
+      if (error.response?.status === 401) {
+        toast.error('Session expired. Please log in again.');
+        localStorage.removeItem('token');
+        navigate('/login');
       } else {
-        toast.error(error.message || 'Failed to update menu item');
+        const serverErrors = error.response?.data?.errors;
+        if (serverErrors?.length) {
+          serverErrors.forEach(err => toast.error(`Validation error: ${err.msg} (${err.path})`));
+        } else {
+          toast.error(error.response?.data?.error || error.message || 'Failed to update menu item');
+        }
       }
     } finally {
       setIsSubmitting(false);
@@ -700,10 +782,17 @@ function ManageMenuItems() {
   const handleDelete = async (id) => {
     if (!user) {
       toast.error('You must be logged in to delete menu items');
+      navigate('/login');
       return;
     }
     if (!window.confirm('Are you sure you want to delete this menu item?')) return;
     try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Please log in');
+        navigate('/login');
+        return;
+      }
       setIsSubmitting(true);
       await api.deleteMenuItem(id, { user_id: user.id });
       toast.success('Menu item deleted');
@@ -711,7 +800,13 @@ function ManageMenuItems() {
       setMenuItems(res.data || []);
     } catch (error) {
       console.error('Delete error:', error);
-      toast.error(error.response?.data?.error || 'Failed to delete menu item');
+      if (error.response?.status === 401) {
+        toast.error('Session expired. Please log in again.');
+        localStorage.removeItem('token');
+        navigate('/login');
+      } else {
+        toast.error(error.response?.data?.error || 'Failed to delete menu item');
+      }
     } finally {
       setIsSubmitting(false);
     }

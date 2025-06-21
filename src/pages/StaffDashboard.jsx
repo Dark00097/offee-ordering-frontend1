@@ -85,6 +85,10 @@ function StaffDashboard({ user, handleNewNotification }) {
     setIsLoading(true);
     setError(null);
     try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Please log in');
+      }
       if (!user || !['admin', 'server'].includes(user.role)) {
         throw new Error('You do not have permission to view orders');
       }
@@ -106,11 +110,17 @@ function StaffDashboard({ user, handleNewNotification }) {
       });
       const errorMessage = err.response?.data?.error || err.message || 'Failed to load orders';
       setError(errorMessage);
-      toast.error(errorMessage);
+      if (err.response?.status === 401 || err.message === 'Please log in') {
+        toast.error('Session expired. Please log in again.');
+        localStorage.removeItem('token');
+        navigate('/login');
+      } else {
+        toast.error(errorMessage);
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [user, timeRange, approvedFilter, processOrder]);
+  }, [user, timeRange, approvedFilter, processOrder, navigate]);
 
   const debouncedFetchOrders = useMemo(() => debounce(fetchOrders, 300), [fetchOrders]);
 
@@ -211,25 +221,51 @@ function StaffDashboard({ user, handleNewNotification }) {
     if (!user || !handleNewNotification) {
       setError('Missing user or notification handler');
       setIsLoading(false);
+      navigate('/login');
       return;
     }
 
     const setupSocketAndFetch = async () => {
-      await debouncedFetchOrders();
-
       try {
-        socketCleanupRef.current = await initSocket(
-          handleNewOrder,
-          handleOrderUpdate,
-          () => {},
-          () => {},
-          () => {},
-          handleOrderApproved,
-          handleNewNotification
+        const token = localStorage.getItem('token');
+        if (!token) {
+          toast.error('Please log in');
+          navigate('/login');
+          return;
+        }
+        const authRes = await api.get('/check-auth');
+        if (!authRes.data?.id || !['admin', 'server'].includes(authRes.data.role)) {
+          toast.error('You do not have permission to access this dashboard');
+          localStorage.removeItem('token');
+          navigate('/login');
+          return;
+        }
+
+        await debouncedFetchOrders();
+
+        socketCleanupRef.current = initSocket(
+          {
+            onNewOrder: handleNewOrder,
+            onOrderUpdate: handleOrderUpdate,
+            onOrderApproved: handleOrderApproved,
+            onDisconnect: () => {
+              console.warn('Socket disconnected');
+              toast.warn('Disconnected from real-time updates');
+            },
+          },
+          { token } // Pass token for socket authentication
         );
       } catch (err) {
-        console.error('Socket initialization failed:', err);
-        toast.error('Failed to connect to real-time updates');
+        console.error('Setup failed:', err.response?.data || err.message);
+        if (err.response?.status === 401) {
+          toast.error('Session expired. Please log in again.');
+          localStorage.removeItem('token');
+          navigate('/login');
+        } else {
+          toast.error(err.response?.data?.error || 'Failed to initialize dashboard');
+          setError(err.response?.data?.error || 'Failed to initialize dashboard');
+        }
+        setIsLoading(false);
       }
     };
 
@@ -241,7 +277,7 @@ function StaffDashboard({ user, handleNewNotification }) {
       }
       debouncedFetchOrders.cancel();
     };
-  }, [user, handleNewNotification, debouncedFetchOrders, handleNewOrder, handleOrderUpdate, handleOrderApproved]);
+  }, [user, handleNewNotification, debouncedFetchOrders, handleNewOrder, handleOrderUpdate, handleOrderApproved, navigate]);
 
   const approveOrder = useCallback(async (orderId) => {
     if (!orderId || isNaN(orderId)) {
@@ -250,12 +286,24 @@ function StaffDashboard({ user, handleNewNotification }) {
       return;
     }
     try {
-      await api.approveOrder(orderId);
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Please log in');
+        navigate('/login');
+        return;
+      }
+      await api.put(`/orders/${orderId}/approve`);
       toast.success(`Order #${orderId} approved`);
       navigate('/staff', { replace: true });
     } catch (error) {
-      console.error('Error approving order:', error);
-      toast.error(error.response?.data?.error || 'Failed to approve order');
+      console.error('Error approving order:', error.response?.data || error.message);
+      if (error.response?.status === 401) {
+        toast.error('Session expired. Please log in again.');
+        localStorage.removeItem('token');
+        navigate('/login');
+      } else {
+        toast.error(error.response?.data?.error || 'Failed to approve order');
+      }
     }
   }, [navigate]);
 
