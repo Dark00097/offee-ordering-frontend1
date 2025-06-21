@@ -10,6 +10,8 @@ const api = axios.create({
 
 api.interceptors.request.use(
   (config) => {
+    const token = localStorage.getItem('token');
+    if (token) config.headers.Authorization = `Bearer ${token}`;
     console.log(`[${config.method.toUpperCase()}] ${config.url}`, {
       withCredentials: config.withCredentials,
       headers: config.headers,
@@ -36,6 +38,31 @@ api.interceptors.response.use(
 );
 
 // API methods
+export const login = async (email, password) => {
+  try {
+    const response = await api.post('/login', { email, password });
+    const { user, token } = response.data;
+    localStorage.setItem('user', JSON.stringify(user));
+    localStorage.setItem('token', token);
+    return response.data;
+  } catch (error) {
+    console.error('Login error:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const logout = async () => {
+  try {
+    const response = await api.post('/logout');
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+    return response.data;
+  } catch (error) {
+    console.error('Logout error:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
 api.getNotifications = (params) => api.get('/notifications', { params });
 api.markNotificationRead = (id) => api.put(`/notifications/${id}/read`);
 api.clearNotifications = () => api.put('/notifications/clear');
@@ -87,4 +114,4 @@ api.updateBreakfastOptionGroup = (breakfastId, groupId, data) => api.put(`/break
 api.deleteBreakfastOptionGroup = (breakfastId, groupId, data) => api.delete(`/breakfasts/${breakfastId}/option-groups/${groupId}`, { data });
 api.updateBreakfastOption = (breakfastId, optionId, data) => api.put(`/breakfasts/${breakfastId}/options/${optionId}`, data);
 
-export { api };
+export { api, login, logout };
