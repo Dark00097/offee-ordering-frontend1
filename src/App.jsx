@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import { api } from './services/api';
 import { v4 as uuidv4 } from 'uuid';
-import { initSocket, reinitializeSocket } from './services/socket'; // Import reinitializeSocket
+import { initSocket, reinitializeSocket } from './services/socket';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import AdminDashboard from './pages/AdminDashboard';
@@ -43,7 +43,7 @@ function App() {
   const [latestOrderId, setLatestOrderId] = useState(null);
   const [user, setUser] = useState(null);
   const [sessionId, setSessionId] = useState(null);
-  const [socketCleanup, setSocketCleanup] = useState(null); // Track socket cleanup function
+  const [socketCleanup, setSocketCleanup] = useState(null);
 
   const handleNewNotification = (notification) => {
     if (!notification.id) {
@@ -74,19 +74,16 @@ function App() {
         if (serverSessionId) {
           setSessionId(serverSessionId);
           localStorage.setItem('sessionId', serverSessionId);
-          api.defaults.headers.common['X-Session-Id'] = serverSessionId;
         } else {
           const fallbackSessionId = localStorage.getItem('sessionId') || `guest-${uuidv4()}`;
           setSessionId(fallbackSessionId);
           localStorage.setItem('sessionId', fallbackSessionId);
-          api.defaults.headers.common['X-Session-Id'] = fallbackSessionId;
         }
       } catch (error) {
         console.error('Error fetching session ID:', error);
         const fallbackSessionId = localStorage.getItem('sessionId') || `guest-${uuidv4()}`;
         setSessionId(fallbackSessionId);
         localStorage.setItem('sessionId', fallbackSessionId);
-        api.defaults.headers.common['X-Session-Id'] = fallbackSessionId;
       }
 
       const checkAuth = async () => {
@@ -109,7 +106,7 @@ function App() {
       };
 
       await Promise.all([checkAuth(), fetchPromotions()]);
-      initializeSocket(); // Initialize socket after session setup
+      initializeSocket();
     };
 
     initializeApp();
@@ -121,29 +118,6 @@ function App() {
 
   const handleLogin = async (user) => {
     setUser(user);
-    // Refresh session ID after login
-    try {
-      const response = await api.get('/session');
-      const newSessionId = response.data.sessionId;
-      if (newSessionId) {
-        setSessionId(newSessionId);
-        localStorage.setItem('sessionId', newSessionId);
-        api.defaults.headers.common['X-Session-Id'] = newSessionId;
-        // Reinitialize socket with new session ID
-        const cleanup = reinitializeSocket({
-          onNewOrder: () => {},
-          onOrderUpdate: () => {},
-          onTableStatusUpdate: () => {},
-          onReservationUpdate: () => {},
-          onRatingUpdate: () => {},
-          onOrderApproved: () => {},
-          onNewNotification: handleNewNotification,
-        });
-        setSocketCleanup(() => cleanup);
-      }
-    } catch (error) {
-      console.error('Error refreshing session ID after login:', error);
-    }
     navigate(user.role === 'admin' ? '/admin' : '/staff');
   };
 

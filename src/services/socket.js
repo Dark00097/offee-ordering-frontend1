@@ -8,8 +8,8 @@ const socket = io(import.meta.env.VITE_API_URL || 'https://coffee-ordering-backe
   reconnectionAttempts: 10,
   reconnectionDelay: 1000,
   reconnectionDelayMax: 5000,
-  transports: ['websocket', 'polling'], // Explicitly allow both transports
-  path: '/socket.io/', // Match backend Socket.IO path
+  transports: ['websocket', 'polling'],
+  path: '/socket.io/',
 });
 
 let currentCleanup = null;
@@ -23,14 +23,13 @@ export const initSocket = (
   onOrderApproved = () => {},
   onNewNotification = () => {}
 ) => {
-  // Clean up previous listeners if they exist
   if (currentCleanup) {
     currentCleanup();
   }
 
   const initializeSocket = async () => {
     try {
-      const response = await api.getSession();
+      const response = await api.get('/session');
       const sessionId = response.data.sessionId;
       if (!sessionId) {
         console.error('Failed to retrieve session ID from server:', response);

@@ -21,10 +21,18 @@ function Login({ onLogin }) {
     try {
       const res = await api.post('/login', { email, password });
       const { user } = res.data;
+      // Fetch new session ID after login
+      const sessionRes = await api.get('/session');
+      const newSessionId = sessionRes.data.sessionId;
+      if (newSessionId) {
+        localStorage.setItem('sessionId', newSessionId);
+        api.defaults.headers.common['X-Session-Id'] = newSessionId;
+      }
       toast.success('Logged in successfully');
       onLogin(user);
     } catch (error) {
-      toast.error('Login failed');
+      const message = error.response?.data?.error || 'Login failed';
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -262,7 +270,6 @@ const styles = {
     overflow: 'hidden'
   },
   
-  // Animated background elements
   backgroundCircle1: {
     position: 'absolute',
     top: '10%',
