@@ -46,7 +46,7 @@ function App() {
   const [socketCleanup, setSocketCleanup] = useState(null);
 
   const handleNewNotification = (notification) => {
-    if (!notification.id) {
+    if (!notification?.id) {
       console.warn('Received notification without ID:', notification);
       return;
     }
@@ -71,7 +71,7 @@ function App() {
       try {
         const response = await api.get('/session');
         const serverSessionId = response.data?.sessionId;
-        if (serverSessionId && typeof serverSessionId === 'string') {
+        if (serverSessionId && typeof serverSessionId === 'string' && !serverSessionId.includes('<!doctype html')) {
           setSessionId(serverSessionId);
           localStorage.setItem('sessionId', serverSessionId);
         } else {
@@ -79,14 +79,16 @@ function App() {
           const fallbackSessionId = localStorage.getItem('sessionId') || `guest-${uuidv4()}`;
           setSessionId(fallbackSessionId);
           localStorage.setItem('sessionId', fallbackSessionId);
-          toast.warn('Failed to initialize session, using guest mode.');
+          setError('Unable to connect to the server. Using guest mode.');
+          toast.error('Failed to initialize session. Please check your connection or try again later.');
         }
       } catch (error) {
         console.error('Error fetching session ID:', error.message, error.response?.data);
         const fallbackSessionId = localStorage.getItem('sessionId') || `guest-${uuidv4()}`;
         setSessionId(fallbackSessionId);
         localStorage.setItem('sessionId', fallbackSessionId);
-        toast.error('Failed to connect to server. Using guest mode.');
+        setError('Unable to connect to the server. Using guest mode.');
+        toast.error('Failed to connect to server. Please check your connection or try again later.');
       }
 
       const checkAuth = async () => {
@@ -327,7 +329,18 @@ function App() {
   }, []);
 
   if (error) {
-    return <div style={{ textAlign: 'center', padding: '20px', color: 'red' }}>{error}</div>;
+    return (
+      <div style={{ textAlign: 'center', padding: '20px', color: 'red' }}>
+        {error}
+        <br />
+        <button
+          style={{ marginTop: '10px', padding: '10px', cursor: 'pointer' }}
+          onClick={() => window.location.reload()}
+        >
+          Retry
+        </button>
+      </div>
+    );
   }
 
   if (!sessionId) {
