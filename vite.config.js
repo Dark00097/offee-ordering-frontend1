@@ -18,6 +18,7 @@ export default defineConfig({
         secure: process.env.NODE_ENV === 'production',
         cookieDomainRewrite: '',
         cookiePathRewrite: '',
+        pathRewrite: { '^/api': '/api' },
         headers: {
           Connection: 'keep-alive',
         },
@@ -26,6 +27,9 @@ export default defineConfig({
         },
         onProxyRes: (proxyRes) => {
           console.log('Proxy response:', proxyRes.statusCode, proxyRes.headers);
+        },
+        onProxyError: (err) => {
+          console.error('Proxy error:', err.message);
         },
       },
     },
@@ -36,6 +40,6 @@ export default defineConfig({
     },
   },
   define: {
-    'process.env': process.env,
+    'process.env.VITE_API_URL': JSON.stringify(process.env.VITE_API_URL || 'https://coffee-ordering-backend1-production.up.railway.app'),
   },
 });
