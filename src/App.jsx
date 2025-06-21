@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import { api } from './services/api';
 import { initSocket } from './services/socket';
+import { v4 as uuidv4 } from 'uuid';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import AdminDashboard from './pages/AdminDashboard';
@@ -41,6 +42,7 @@ function App() {
   const [error, setError] = useState(null);
   const [latestOrderId, setLatestOrderId] = useState(null);
   const [user, setUser] = useState(null);
+  const [sessionId, setSessionId] = useState(null);
   const [socketCleanup, setSocketCleanup] = useState(null);
 
   const handleNewNotification = (notification) => {
@@ -51,24 +53,24 @@ function App() {
     toast.info(notification.message, { autoClose: 5000 });
   };
 
-  const initializeSocket = () => {
-    if (user) { // Only initialize socket for authenticated users
-      const cleanup = initSocket(
-        () => {},
-        () => {},
-        () => {},
-        () => {},
-        () => {},
-        () => {},
-        handleNewNotification
-      );
-      setSocketCleanup(() => cleanup);
-    }
-  };
-
   useEffect(() => {
     const initializeApp = async () => {
       try {
+        // Initialize session
+        const response = await api.get('/session');
+        const serverSessionId = response.data.sessionId;
+        if (serverSessionId) {
+          setSessionId(serverSessionId);
+          localStorage.setItem('sessionId', serverSessionId);
+          api.defaults.headers.common['X-Session-Id'] = serverSessionId;
+        } else {
+          const fallbackSessionId = localStorage.getItem('sessionId') || `guest-${uuidv4()}`;
+          setSessionId(fallbackSessionId);
+          localStorage.setItem('sessionId', fallbackSessionId);
+          api.defaults.headers.common['X-Session-Id'] = fallbackSessionId;
+        }
+
+        // Check authentication
         const checkAuth = async () => {
           try {
             const res = await api.get('/check-auth');
@@ -76,11 +78,12 @@ function App() {
           } catch (err) {
             setUser(null);
             if (window.location.pathname.startsWith('/admin') || window.location.pathname.startsWith('/staff')) {
-              navigate('/login'); // Redirect to login for protected routes
+              navigate('/login');
             }
           }
         };
 
+        // Fetch promotions
         const fetchPromotions = async () => {
           try {
             const response = await api.get('/promotions');
@@ -92,9 +95,26 @@ function App() {
         };
 
         await Promise.all([checkAuth(), fetchPromotions()]);
-        initializeSocket();
+
+        // Initialize socket for authenticated users
+        if (user) {
+          const cleanup = initSocket(
+            () => {},
+            () => {},
+            () => {},
+            () => {},
+            () => {},
+            () => {},
+            handleNewNotification
+          );
+          setSocketCleanup(() => cleanup);
+        }
       } catch (error) {
         console.error('Error initializing app:', error);
+        const fallbackSessionId = localStorage.getItem('sessionId') || `guest-${uuidv4()}`;
+        setSessionId(fallbackSessionId);
+        localStorage.setItem('sessionId', fallbackSessionId);
+        api.defaults.headers.common['X-Session-Id'] = fallbackSessionId;
       }
     };
 
@@ -103,19 +123,19 @@ function App() {
     return () => {
       if (socketCleanup) socketCleanup();
     };
-  }, [user]); // Re-run when user changes
+  }, [user, navigate]);
 
   const handleLogin = async (user) => {
     setUser(user);
-    const cleanup = reinitializeSocket({
-      onNewOrder: () => {},
-      onOrderUpdate: () => {},
-      onTableStatusUpdate: () => {},
-      onReservationUpdate: () => {},
-      onRatingUpdate: () => {},
-      onOrderApproved: () => {},
-      onNewNotification: handleNewNotification,
-    });
+    const cleanup = initSocket(
+      () => {},
+      () => {},
+      () => {},
+      () => {},
+      () => {},
+      () => {},
+      handleNewNotification
+    );
     setSocketCleanup(() => cleanup);
     navigate(user.role === 'admin' ? '/admin' : '/staff');
   };
@@ -162,7 +182,7 @@ function App() {
         return [
           ...prev,
           {
-            cartItemId: item.cartItemId || Math.random().toString(36).substr(2, 9),
+            cartItemId: uuidv4(),
             item_id: item.item_id,
             quantity: item.quantity || 1,
             unit_price: parseFloat(item.unit_price || 0),
@@ -196,7 +216,7 @@ function App() {
         return [
           ...prev,
           {
-            cartItemId: item.cartItemId || Math.random().toString(36).substr(2, 9),
+            cartItemId: uuidv4(),
             breakfast_id: item.breakfast_id,
             quantity: item.quantity || 1,
             unit_price: parseFloat(item.unit_price || 0),
@@ -326,6 +346,10 @@ function App() {
     return <div style={{ textAlign: 'center', padding: '20px', color: 'red' }}>{error}</div>;
   }
 
+  if (!sessionId) {
+    return <div style={{ textAlign: 'center', padding: '20px' }}>Initializing session...</div>;
+  }
+
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px', minHeight: '100vh' }}>
       <Header
@@ -355,7 +379,7 @@ function App() {
         <Route path="/staff/table-reservations" element={<StaffTableReservations />} />
         <Route path="/category/:id" element={<CategoryMenu addToCart={addToCart} />} />
         <Route path="/product/:id" element={<ProductDetails addToCart={addToCart} latestOrderId={latestOrderId} />} />
-        <Route path="/order-waiting/:orderId" element={<OrderWaiting />} />
+        <Route path="/order-waiting/:orderId" element={<OrderWaiting sessionId={sessionId} />} />
         <Route path="/breakfast" element={<BreakfastMenu addToCart={addToCart} />} />
         <Route path="/breakfast/:id" element={<BreakfastMenu addToCart={addToCart} />} />
         <Route path="*" element={<div style={{ textAlign: 'center', color: '#666' }}>404 Not Found</div>} />
@@ -373,6 +397,7 @@ function App() {
         setPromotionId={setPromotionId}
         promotions={promotions}
         clearCart={clearCart}
+        sessionId={sessionId}
       />
       <Footer />
     </div>

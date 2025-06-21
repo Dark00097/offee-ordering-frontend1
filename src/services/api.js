@@ -28,7 +28,6 @@ api.interceptors.response.use(
   }
 );
 
-// API methods (same as localhost)
 api.getNotifications = (params) => api.get('/notifications', { params });
 api.markNotificationRead = (id) => api.put(`/notifications/${id}/read`);
 api.clearNotifications = () => api.put('/notifications/clear');
