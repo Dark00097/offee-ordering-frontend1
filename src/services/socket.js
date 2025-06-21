@@ -7,6 +7,9 @@ const socket = io(import.meta.env.VITE_API_URL || 'https://coffee-ordering-backe
   reconnectionAttempts: 10,
   reconnectionDelay: 1000,
   reconnectionDelayMax: 5000,
+  extraHeaders: {
+    Authorization: `Bearer ${localStorage.getItem('token') || ''}`,
+  },
 });
 
 export const initSocket = (
@@ -22,11 +25,16 @@ export const initSocket = (
 
   const initializeSocket = async () => {
     try {
-      const response = await api.getSession();
-      const sessionId = response.data.sessionId;
+      // Use session ID from localStorage if available, or fetch if needed
+      let sessionId = localStorage.getItem('sessionId');
       if (!sessionId) {
-        console.error('Failed to retrieve session ID from server');
-        return () => {};
+        const response = await api.getSession();
+        sessionId = response.data.sessionId;
+        if (sessionId) localStorage.setItem('sessionId', sessionId);
+        else {
+          console.error('Failed to retrieve session ID from server');
+          return () => {};
+        }
       }
 
       socket.emit('join-session', sessionId);

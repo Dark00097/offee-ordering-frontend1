@@ -38,135 +38,55 @@ api.interceptors.response.use(
 );
 
 // API methods
-const getNotifications = (params) => api.get('/notifications', { params });
-const markNotificationRead = (id) => api.put(`/notifications/${id}/read`);
-const clearNotifications = () => api.put('/notifications/clear');
-const getTables = () => api.get('/tables');
-const getAvailableTables = () => api.get('/tables?status=available');
-const addTable = (data) => api.post('/tables', data);
-const updateTable = (id, data) => api.put(`/tables/${id}`, data);
-const deleteTable = (id, data) => api.delete(`/tables/${id}`, { data });
-const getReservations = () => api.get('/reservations');
-const addReservation = (data) => api.post('/reservations', data);
-const updateReservation = (id, data) => api.put(`/reservations/${id}`, data);
-const submitRating = (data) => api.post('/ratings', data);
-const getRatingsByItem = (itemId) => api.get(`/ratings?item_id=${itemId}`);
-const getRatingsByBreakfast = (breakfastId) => api.get(`/ratings?breakfast_id=${breakfastId}`);
-const updateUser = (id, data) => api.put(`/users/${id}`, data);
-const deleteUser = (id, data) => api.delete(`/users/${id}`, { data });
-const addCategory = (data) => api.post('/categories', data);
-const updateCategory = (id, data) => api.put(`/categories/${id}`, data);
-const deleteCategory = (id, data) => api.delete(`/categories/${id}`, { data });
-const getTopCategories = () => api.get('/categories/top');
-const getSupplementsByMenuItem = (menuItemId) => api.get(`/menu-items/${menuItemId}/supplements`);
-const addSupplementToMenuItem = (menuItemId, data) => api.post(`/menu-items/${menuItemId}/supplements`, data);
-const updateSupplementForMenuItem = (menuItemId, supplementId, data) => api.put(`/menu-items/${menuItemId}/supplements/${supplementId}`, data);
-const deleteSupplementFromMenuItem = (menuItemId, supplementId, data) => api.delete(`/menu-items/${menuItemId}/supplements/${supplementId}`, { data });
-const addMenuItem = (data) => api.post('/menu-items', data);
-const updateMenuItem = (id, data) => api.put(`/menu-items/${id}`, data);
-const deleteMenuItem = (id, data) => api.delete(`/menu-items/${id}`, { data });
-const searchMenuItems = (query) => api.get('/menu-items/search', { params: { query } });
-const submitOrder = (data) => api.post('/orders', data);
-const approveOrder = (id) => api.post(`/orders/${id}/approve`);
-const getOrder = (id) => api.get(`/orders/${id}`);
-const getSession = () => api.get('/session');
-const getBanners = (params) => api.get('/banners', { params });
-const getEnabledBanners = () => api.get('/banners/enabled');
-const addBanner = (data) => api.post('/banners', data);
-const updateBanner = (id, data) => api.put(`/banners/${id}`, data);
-const deleteBanner = (id, data) => api.delete(`/banners/${id}`, { data });
-const getBreakfasts = () => api.get('/breakfasts');
-const getBreakfast = (id) => api.get(`/breakfasts/${id}`);
-const getBreakfastOptions = (id) => api.get(`/breakfasts/${id}/options`);
-const addBreakfast = (data) => api.post('/breakfasts', data);
-const updateBreakfast = (id, data) => api.put(`/breakfasts/${id}`, data);
-const deleteBreakfast = (id, data) => api.delete(`/breakfasts/${id}`, { data });
-const addBreakfastOption = (id, data) => api.post(`/breakfasts/${id}/options`, data);
-const deleteBreakfastOption = (breakfastId, optionId, data) => api.delete(`/breakfasts/${breakfastId}/options/${optionId}`, { data });
-const getBreakfastOptionGroups = (id) => api.get(`/breakfasts/${id}/option-groups`);
-const addBreakfastOptionGroup = (id, data) => api.post(`/breakfasts/${id}/option-groups`, data);
-const updateBreakfastOptionGroup = (breakfastId, groupId, data) => api.put(`/breakfasts/${breakfastId}/option-groups/${groupId}`, data);
-const deleteBreakfastOptionGroup = (breakfastId, groupId, data) => api.delete(`/breakfasts/${breakfastId}/option-groups/${groupId}`, { data });
-const updateBreakfastOption = (breakfastId, optionId, data) => api.put(`/breakfasts/${breakfastId}/options/${optionId}`, data);
+api.getNotifications = (params) => api.get('/notifications', { params });
+api.markNotificationRead = (id) => api.put(`/notifications/${id}/read`);
+api.clearNotifications = () => api.put('/notifications/clear');
+api.getTables = () => api.get('/tables');
+api.getAvailableTables = () => api.get('/tables?status=available');
+api.addTable = (data) => api.post('/tables', data);
+api.updateTable = (id, data) => api.put(`/tables/${id}`, data);
+api.deleteTable = (id, data) => api.delete(`/tables/${id}`, { data });
+api.getReservations = () => api.get('/reservations');
+api.addReservation = (data) => api.post('/reservations', data);
+api.updateReservation = (id, data) => api.put(`/reservations/${id}`, data);
+api.submitRating = (data) => api.post('/ratings', data);
+api.getRatingsByItem = (itemId) => api.get(`/ratings?item_id=${itemId}`);
+api.getRatingsByBreakfast = (breakfastId) => api.get(`/ratings?breakfast_id=${breakfastId}`);
+api.updateUser = (id, data) => api.put(`/users/${id}`, data);
+api.deleteUser = (id, data) => api.delete(`/users/${id}`, { data });
+api.addCategory = (data) => api.post('/categories', data);
+api.updateCategory = (id, data) => api.put(`/categories/${id}`, data);
+api.deleteCategory = (id, data) => api.delete(`/categories/${id}`, { data });
+api.getTopCategories = () => api.get('/categories/top');
+api.getSupplementsByMenuItem = (menuItemId) => api.get(`/menu-items/${menuItemId}/supplements`);
+api.addSupplementToMenuItem = (menuItemId, data) => api.post(`/menu-items/${menuItemId}/supplements`, data);
+api.updateSupplementForMenuItem = (menuItemId, supplementId, data) => api.put(`/menu-items/${menuItemId}/supplements/${supplementId}`, data);
+api.deleteSupplementFromMenuItem = (menuItemId, supplementId, data) => api.delete(`/menu-items/${menuItemId}/supplements/${supplementId}`, { data });
+api.addMenuItem = (data) => api.post('/menu-items', data);
+api.updateMenuItem = (id, data) => api.put(`/menu-items/${id}`, data);
+api.deleteMenuItem = (id, data) => api.delete(`/menu-items/${id}`, { data });
+api.searchMenuItems = (query) => api.get('/menu-items/search', { params: { query } });
+api.submitOrder = (data) => api.post('/orders', data);
+api.approveOrder = (id) => api.post(`/orders/${id}/approve`);
+api.getOrder = (id) => api.get(`/orders/${id}`);
+api.getSession = () => api.get('/session');
+api.getBanners = (params) => api.get('/banners', { params });
+api.getEnabledBanners = () => api.get('/banners/enabled');
+api.addBanner = (data) => api.post('/banners', data);
+api.updateBanner = (id, data) => api.put(`/banners/${id}`, data);
+api.deleteBanner = (id, data) => api.delete(`/banners/${id}`, { data });
+api.getBreakfasts = () => api.get('/breakfasts');
+api.getBreakfast = (id) => api.get(`/breakfasts/${id}`);
+api.getBreakfastOptions = (id) => api.get(`/breakfasts/${id}/options`);
+api.addBreakfast = (data) => api.post('/breakfasts', data);
+api.updateBreakfast = (id, data) => api.put(`/breakfasts/${id}`, data);
+api.deleteBreakfast = (id, data) => api.delete(`/breakfasts/${id}`, { data });
+api.addBreakfastOption = (id, data) => api.post(`/breakfasts/${id}/options`, data);
+api.deleteBreakfastOption = (breakfastId, optionId, data) => api.delete(`/breakfasts/${breakfastId}/options/${optionId}`, { data });
+api.getBreakfastOptionGroups = (id) => api.get(`/breakfasts/${id}/option-groups`);
+api.addBreakfastOptionGroup = (id, data) => api.post(`/breakfasts/${id}/option-groups`, data);
+api.updateBreakfastOptionGroup = (breakfastId, groupId, data) => api.put(`/breakfasts/${breakfastId}/option-groups/${groupId}`, data);
+api.deleteBreakfastOptionGroup = (breakfastId, groupId, data) => api.delete(`/breakfasts/${breakfastId}/option-groups/${groupId}`, { data });
+api.updateBreakfastOption = (breakfastId, optionId, data) => api.put(`/breakfasts/${breakfastId}/options/${optionId}`, data);
 
-const login = async (email, password) => {
-  try {
-    const response = await api.post('/login', { email, password });
-    const { user, token } = response.data;
-    localStorage.setItem('user', JSON.stringify(user));
-    localStorage.setItem('token', token);
-    return response.data;
-  } catch (error) {
-    console.error('Login error:', error.response?.data || error.message);
-    throw error;
-  }
-};
-
-const logout = async () => {
-  try {
-    const response = await api.post('/logout');
-    localStorage.removeItem('user');
-    localStorage.removeItem('token');
-    return response.data;
-  } catch (error) {
-    console.error('Logout error:', error.response?.data || error.message);
-    throw error;
-  }
-};
-
-// Export all methods as a single object
-export default {
-  api,
-  login,
-  logout,
-  getNotifications,
-  markNotificationRead,
-  clearNotifications,
-  getTables,
-  getAvailableTables,
-  addTable,
-  updateTable,
-  deleteTable,
-  getReservations,
-  addReservation,
-  updateReservation,
-  submitRating,
-  getRatingsByItem,
-  getRatingsByBreakfast,
-  updateUser,
-  deleteUser,
-  addCategory,
-  updateCategory,
-  deleteCategory,
-  getTopCategories,
-  getSupplementsByMenuItem,
-  addSupplementToMenuItem,
-  updateSupplementForMenuItem,
-  deleteSupplementFromMenuItem,
-  addMenuItem,
-  updateMenuItem,
-  deleteMenuItem,
-  searchMenuItems,
-  submitOrder,
-  approveOrder,
-  getOrder,
-  getSession,
-  getBanners,
-  getEnabledBanners,
-  addBanner,
-  updateBanner,
-  deleteBanner,
-  getBreakfasts,
-  getBreakfast,
-  getBreakfastOptions,
-  addBreakfast,
-  updateBreakfast,
-  deleteBreakfast,
-  addBreakfastOption,
-  deleteBreakfastOption,
-  getBreakfastOptionGroups,
-  addBreakfastOptionGroup,
-  updateBreakfastOptionGroup,
-  deleteBreakfastOptionGroup,
-  updateBreakfastOption,
-};
+export { api };
