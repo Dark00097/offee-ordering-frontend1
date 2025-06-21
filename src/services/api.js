@@ -13,6 +13,7 @@ api.interceptors.request.use(
     console.log(`[${config.method.toUpperCase()}] ${config.url}`, {
       withCredentials: config.withCredentials,
       headers: config.headers,
+      cookies: document.cookie || 'No cookie in document.cookie',
     });
     return config;
   },
