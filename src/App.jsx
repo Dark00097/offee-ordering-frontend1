@@ -1,7 +1,7 @@
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
-import { api } from './services/api';
+import { login, logout, api } from './services/api';
 import { initSocket } from './services/socket';
 import Home from './pages/Home';
 import Login from './pages/Login';
@@ -40,7 +40,7 @@ function App() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [error, setError] = useState(null);
   const [latestOrderId, setLatestOrderId] = useState(null);
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(JSON.parse(localStorage.getItem('user')) || null);
   const [socketCleanup, setSocketCleanup] = useState(null);
 
   const handleNewNotification = (notification) => {
@@ -73,9 +73,7 @@ function App() {
           try {
             const res = await api.get('/check-auth');
             setUser(res.data);
-            if (res.data) {
-              initializeSocket();
-            }
+            if (res.data) initializeSocket();
           } catch (err) {
             setUser(null);
             if (window.location.pathname.startsWith('/admin') || window.location.pathname.startsWith('/staff')) {
@@ -107,26 +105,22 @@ function App() {
     };
   }, []);
 
-  const handleLogin = async (user) => {
-    setUser(user);
+  const handleLogin = async (email, password) => {
     try {
-      const authCheck = await api.get('/check-auth');
-      if (authCheck.data) {
-        initializeSocket();
-        navigate(user.role === 'admin' ? '/admin' : '/staff');
-      } else {
-        throw new Error('Session not established');
-      }
+      const data = await login(email, password);
+      setUser(data.user);
+      if (data.user.role === 'admin') navigate('/admin');
+      else if (data.user.role === 'server') navigate('/staff');
+      initializeSocket();
     } catch (error) {
-      toast.error('Failed to verify session');
+      toast.error('Login failed');
       setUser(null);
-      navigate('/login');
     }
   };
 
   const handleLogout = async () => {
     try {
-      await api.post('/logout');
+      await logout();
       setUser(null);
       setCart([]);
       setDeliveryAddress('');
