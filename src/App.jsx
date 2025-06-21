@@ -52,16 +52,18 @@ function App() {
   };
 
   const initializeSocket = () => {
-    const cleanup = initSocket(
-      () => {},
-      () => {},
-      () => {},
-      () => {},
-      () => {},
-      () => {},
-      handleNewNotification
-    );
-    setSocketCleanup(() => cleanup);
+    if (user) { // Only initialize socket for authenticated users
+      const cleanup = initSocket(
+        () => {},
+        () => {},
+        () => {},
+        () => {},
+        () => {},
+        () => {},
+        handleNewNotification
+      );
+      setSocketCleanup(() => cleanup);
+    }
   };
 
   useEffect(() => {
@@ -73,6 +75,9 @@ function App() {
             setUser(res.data);
           } catch (err) {
             setUser(null);
+            if (window.location.pathname.startsWith('/admin') || window.location.pathname.startsWith('/staff')) {
+              navigate('/login'); // Redirect to login for protected routes
+            }
           }
         };
 
@@ -98,11 +103,10 @@ function App() {
     return () => {
       if (socketCleanup) socketCleanup();
     };
-  }, []);
+  }, [user]); // Re-run when user changes
 
   const handleLogin = async (user) => {
     setUser(user);
-    // Reinitialize socket after login
     const cleanup = reinitializeSocket({
       onNewOrder: () => {},
       onOrderUpdate: () => {},
@@ -124,7 +128,7 @@ function App() {
       setDeliveryAddress('');
       setPromotionId('');
       setIsCartOpen(false);
-      initializeSocket();
+      if (socketCleanup) socketCleanup();
       toast.success('Successfully logged out');
       navigate('/');
     } catch (error) {

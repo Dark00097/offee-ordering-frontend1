@@ -21,10 +21,17 @@ function Login({ onLogin }) {
     try {
       const res = await api.post('/login', { email, password });
       const { user } = res.data;
-      toast.success('Logged in successfully');
-      onLogin(user);
+      // Verify session is established
+      const authCheck = await api.get('/check-auth');
+      if (authCheck.data) {
+        toast.success('Logged in successfully');
+        onLogin(user);
+      } else {
+        throw new Error('Session not established');
+      }
     } catch (error) {
-      toast.error('Login failed');
+      const errorMessage = error.response?.data?.error || error.message || 'Login failed';
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -36,13 +43,11 @@ function Login({ onLogin }) {
 
   return (
     <div style={styles.container}>
-      {/* Animated background circles */}
       <div style={styles.backgroundCircle1}></div>
       <div style={styles.backgroundCircle2}></div>
       <div style={styles.backgroundCircle3}></div>
 
       <div style={styles.loginCard} className="login-card">
-        {/* Header with animated icon */}
         <div style={styles.header}>
           <div style={styles.iconContainer} className="icon-container">
             <LoginIcon style={styles.headerIcon} />
@@ -52,7 +57,6 @@ function Login({ onLogin }) {
         </div>
 
         <form onSubmit={handleSubmit} style={styles.form}>
-          {/* Email Input */}
           <div style={styles.inputGroup} className="input-group">
             <div 
               style={{
@@ -79,7 +83,6 @@ function Login({ onLogin }) {
             </div>
           </div>
 
-          {/* Password Input */}
           <div style={styles.inputGroup} className="input-group">
             <div 
               style={{
@@ -114,7 +117,6 @@ function Login({ onLogin }) {
             </div>
           </div>
 
-          {/* Submit Button */}
           <button 
             type="submit" 
             disabled={isLoading}
@@ -261,8 +263,6 @@ const styles = {
     position: 'relative',
     overflow: 'hidden'
   },
-  
-  // Animated background elements
   backgroundCircle1: {
     position: 'absolute',
     top: '10%',
@@ -274,7 +274,6 @@ const styles = {
     animation: 'float 6s ease-in-out infinite',
     zIndex: 0
   },
-  
   backgroundCircle2: {
     position: 'absolute',
     bottom: '20%',
@@ -286,7 +285,6 @@ const styles = {
     animation: 'float 8s ease-in-out infinite reverse',
     zIndex: 0
   },
-  
   backgroundCircle3: {
     position: 'absolute',
     top: '60%',
@@ -298,7 +296,6 @@ const styles = {
     animation: 'pulse 4s ease-in-out infinite',
     zIndex: 0
   },
-
   loginCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     backdropFilter: 'blur(20px)',
@@ -311,12 +308,10 @@ const styles = {
     position: 'relative',
     zIndex: 1
   },
-  
   header: {
     textAlign: 'center',
     marginBottom: '40px'
   },
-  
   iconContainer: {
     display: 'inline-flex',
     alignItems: 'center',
@@ -329,13 +324,11 @@ const styles = {
     boxShadow: '0 8px 20px rgba(0, 0, 0, 0.1)',
     border: '1px solid rgba(255, 255, 255, 0.8)'
   },
-  
   headerIcon: {
     fontSize: '36px',
     color: '#475569',
     filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1))'
   },
-  
   title: {
     fontSize: '32px',
     fontWeight: '700',
@@ -343,25 +336,21 @@ const styles = {
     margin: '0 0 8px 0',
     letterSpacing: '-0.5px'
   },
-  
   subtitle: {
     fontSize: '16px',
     color: '#64748b',
     margin: '0',
     fontWeight: '400'
   },
-  
   form: {
     display: 'flex',
     flexDirection: 'column',
     gap: '24px'
   },
-  
   inputGroup: {
     display: 'flex',
     flexDirection: 'column'
   },
-  
   inputContainer: {
     position: 'relative',
     display: 'flex',
@@ -371,13 +360,11 @@ const styles = {
     border: '2px solid rgba(226, 232, 240, 0.5)',
     overflow: 'hidden'
   },
-  
   inputContainerFocused: {
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderColor: 'rgba(30, 41, 59, 0.3)',
     boxShadow: '0 0 0 4px rgba(30, 41, 59, 0.05)'
   },
-  
   inputIcon: {
     position: 'absolute',
     left: '16px',
@@ -386,12 +373,10 @@ const styles = {
     zIndex: 1,
     transition: 'all 0.3s ease'
   },
-  
   inputIconActive: {
     color: '#475569',
     transform: 'scale(1.1)'
   },
-  
   input: {
     width: '100%',
     padding: '16px 16px 16px 52px',
@@ -404,7 +389,6 @@ const styles = {
     color: '#1e293b',
     fontWeight: '500'
   },
-  
   visibilityButton: {
     position: 'absolute',
     right: '16px',
@@ -420,7 +404,6 @@ const styles = {
     width: '32px',
     height: '32px'
   },
-  
   submitButton: {
     background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
     color: '#ffffff',
@@ -435,19 +418,16 @@ const styles = {
     overflow: 'hidden',
     boxShadow: '0 4px 15px rgba(30, 41, 59, 0.2)'
   },
-  
   submitButtonDisabled: {
     background: 'linear-gradient(135deg, #94a3b8 0%, #cbd5e1 100%)',
     cursor: 'not-allowed'
   },
-  
   buttonContent: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     gap: '8px'
   },
-  
   spinner: {
     width: '16px',
     height: '16px',
