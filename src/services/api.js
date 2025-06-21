@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: `${import.meta.env.VITE_API_URL || 'https://coffee-ordering-backend1-production.up.railway.app'}/api`,
+  baseURL: '/api', // Use proxy path
   withCredentials: true,
   timeout: 10000, // Add timeout to avoid hanging requests
 });
