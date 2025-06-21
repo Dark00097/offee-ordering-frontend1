@@ -8,8 +8,8 @@ const socket = io(import.meta.env.VITE_API_URL || 'https://coffee-ordering-backe
   reconnectionAttempts: 10,
   reconnectionDelay: 1000,
   reconnectionDelayMax: 5000,
-  transports: ['websocket', 'polling'],
-  path: '/socket.io/',
+  transports: ['websocket', 'polling'], // Explicitly allow both transports
+  path: '/socket.io/', // Match backend Socket.IO path
 });
 
 let currentCleanup = null;
@@ -23,26 +23,19 @@ export const initSocket = (
   onOrderApproved = () => {},
   onNewNotification = () => {}
 ) => {
+  // Clean up previous listeners if they exist
   if (currentCleanup) {
     currentCleanup();
   }
 
   const initializeSocket = async () => {
     try {
-      const response = await api.get('/session', { withCredentials: true });
-      if (
-        response.status !== 200 ||
-        !response.data ||
-        typeof response.data !== 'object' ||
-        !response.data.sessionId ||
-        typeof response.data.sessionId !== 'string' ||
-        response.data.sessionId.includes('<!doctype html')
-      ) {
-        console.error('Failed to retrieve valid session ID from server:', response.status, response.data);
+      const response = await api.getSession();
+      const sessionId = response.data.sessionId;
+      if (!sessionId) {
+        console.error('Failed to retrieve session ID from server:', response);
         return () => {};
       }
-
-      const sessionId = response.data.sessionId;
 
       socket.emit('join-session', sessionId);
 
@@ -133,7 +126,7 @@ export const initSocket = (
 
       console.log('Socket initialized with session:', sessionId);
     } catch (error) {
-      console.error('Error initializing socket:', error.message, error.response?.data || error.response?.statusText);
+      console.error('Error initializing socket:', error.message, error);
       currentCleanup = () => {};
     }
   };

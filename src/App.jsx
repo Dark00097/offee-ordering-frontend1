@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import { api } from './services/api';
 import { v4 as uuidv4 } from 'uuid';
-import { initSocket, reinitializeSocket } from './services/socket';
+import { initSocket, reinitializeSocket } from './services/socket'; // Import reinitializeSocket
 import Home from './pages/Home';
 import Login from './pages/Login';
 import AdminDashboard from './pages/AdminDashboard';
@@ -43,10 +43,10 @@ function App() {
   const [latestOrderId, setLatestOrderId] = useState(null);
   const [user, setUser] = useState(null);
   const [sessionId, setSessionId] = useState(null);
-  const [socketCleanup, setSocketCleanup] = useState(null);
+  const [socketCleanup, setSocketCleanup] = useState(null); // Track socket cleanup function
 
   const handleNewNotification = (notification) => {
-    if (!notification?.id) {
+    if (!notification.id) {
       console.warn('Received notification without ID:', notification);
       return;
     }
@@ -70,25 +70,23 @@ function App() {
     const initializeApp = async () => {
       try {
         const response = await api.get('/session');
-        const serverSessionId = response.data?.sessionId;
-        if (serverSessionId && typeof serverSessionId === 'string' && !serverSessionId.includes('<!doctype html')) {
+        const serverSessionId = response.data.sessionId;
+        if (serverSessionId) {
           setSessionId(serverSessionId);
           localStorage.setItem('sessionId', serverSessionId);
+          api.defaults.headers.common['X-Session-Id'] = serverSessionId;
         } else {
-          console.warn('Invalid session ID from server:', response.data);
           const fallbackSessionId = localStorage.getItem('sessionId') || `guest-${uuidv4()}`;
           setSessionId(fallbackSessionId);
           localStorage.setItem('sessionId', fallbackSessionId);
-          setError('Unable to connect to the server. Using guest mode.');
-          toast.error('Failed to initialize session. Please check your connection or try again later.');
+          api.defaults.headers.common['X-Session-Id'] = fallbackSessionId;
         }
       } catch (error) {
-        console.error('Error fetching session ID:', error.message, error.response?.data);
+        console.error('Error fetching session ID:', error);
         const fallbackSessionId = localStorage.getItem('sessionId') || `guest-${uuidv4()}`;
         setSessionId(fallbackSessionId);
         localStorage.setItem('sessionId', fallbackSessionId);
-        setError('Unable to connect to the server. Using guest mode.');
-        toast.error('Failed to connect to server. Please check your connection or try again later.');
+        api.defaults.headers.common['X-Session-Id'] = fallbackSessionId;
       }
 
       const checkAuth = async () => {
@@ -111,7 +109,7 @@ function App() {
       };
 
       await Promise.all([checkAuth(), fetchPromotions()]);
-      initializeSocket();
+      initializeSocket(); // Initialize socket after session setup
     };
 
     initializeApp();
@@ -123,6 +121,29 @@ function App() {
 
   const handleLogin = async (user) => {
     setUser(user);
+    // Refresh session ID after login
+    try {
+      const response = await api.get('/session');
+      const newSessionId = response.data.sessionId;
+      if (newSessionId) {
+        setSessionId(newSessionId);
+        localStorage.setItem('sessionId', newSessionId);
+        api.defaults.headers.common['X-Session-Id'] = newSessionId;
+        // Reinitialize socket with new session ID
+        const cleanup = reinitializeSocket({
+          onNewOrder: () => {},
+          onOrderUpdate: () => {},
+          onTableStatusUpdate: () => {},
+          onReservationUpdate: () => {},
+          onRatingUpdate: () => {},
+          onOrderApproved: () => {},
+          onNewNotification: handleNewNotification,
+        });
+        setSocketCleanup(() => cleanup);
+      }
+    } catch (error) {
+      console.error('Error refreshing session ID after login:', error);
+    }
     navigate(user.role === 'admin' ? '/admin' : '/staff');
   };
 
@@ -134,6 +155,7 @@ function App() {
       setDeliveryAddress('');
       setPromotionId('');
       setIsCartOpen(false);
+      // Reinitialize socket after logout
       initializeSocket();
       toast.success('Successfully logged out');
       navigate('/');
@@ -329,18 +351,7 @@ function App() {
   }, []);
 
   if (error) {
-    return (
-      <div style={{ textAlign: 'center', padding: '20px', color: 'red' }}>
-        {error}
-        <br />
-        <button
-          style={{ marginTop: '10px', padding: '10px', cursor: 'pointer' }}
-          onClick={() => window.location.reload()}
-        >
-          Retry
-        </button>
-      </div>
-    );
+    return <div style={{ textAlign: 'center', padding: '20px', color: 'red' }}>{error}</div>;
   }
 
   if (!sessionId) {
