@@ -70,20 +70,23 @@ function App() {
     const initializeApp = async () => {
       try {
         const response = await api.get('/session');
-        const serverSessionId = response.data.sessionId;
-        if (serverSessionId) {
+        const serverSessionId = response.data?.sessionId;
+        if (serverSessionId && typeof serverSessionId === 'string') {
           setSessionId(serverSessionId);
           localStorage.setItem('sessionId', serverSessionId);
         } else {
+          console.warn('Invalid session ID from server:', response.data);
           const fallbackSessionId = localStorage.getItem('sessionId') || `guest-${uuidv4()}`;
           setSessionId(fallbackSessionId);
           localStorage.setItem('sessionId', fallbackSessionId);
+          toast.warn('Failed to initialize session, using guest mode.');
         }
       } catch (error) {
-        console.error('Error fetching session ID:', error);
+        console.error('Error fetching session ID:', error.message, error.response?.data);
         const fallbackSessionId = localStorage.getItem('sessionId') || `guest-${uuidv4()}`;
         setSessionId(fallbackSessionId);
         localStorage.setItem('sessionId', fallbackSessionId);
+        toast.error('Failed to connect to server. Using guest mode.');
       }
 
       const checkAuth = async () => {
@@ -129,7 +132,6 @@ function App() {
       setDeliveryAddress('');
       setPromotionId('');
       setIsCartOpen(false);
-      // Reinitialize socket after logout
       initializeSocket();
       toast.success('Successfully logged out');
       navigate('/');

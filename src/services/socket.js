@@ -30,8 +30,15 @@ export const initSocket = (
   const initializeSocket = async () => {
     try {
       const response = await api.get('/session', { withCredentials: true });
-      if (response.status !== 200 || !response.data || typeof response.data !== 'object' || response.data.includes?.('<!doctype html') || !response.data.sessionId) {
-        console.error('Failed to retrieve session ID from server:', response.status, response.data ? 'HTML response' : 'No valid data');
+      if (
+        response.status !== 200 ||
+        !response.data ||
+        typeof response.data !== 'object' ||
+        !response.data.sessionId ||
+        typeof response.data.sessionId !== 'string' ||
+        response.data.sessionId.includes('<!doctype html')
+      ) {
+        console.error('Failed to retrieve valid session ID from server:', response.status, response.data);
         return () => {};
       }
 
@@ -81,7 +88,7 @@ export const initSocket = (
 
       socket.on('newNotification', (data) => {
         console.log('Received newNotification:', data);
-        if (typeof onNewNotification === 'function') onNewNotification(data);
+        if (typeof onNewNotification === sn('function') onNewNotification(data);
       });
 
       socket.on('session-error', (error) => {
