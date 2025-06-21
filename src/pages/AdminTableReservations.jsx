@@ -455,92 +455,52 @@ function AdminTableReservations() {
     async function initialize() {
       try {
         setIsLoading(true);
-        const token = localStorage.getItem('token');
-        if (!token) {
-          toast.error('Please log in');
-          navigate('/login');
-          return;
-        }
-
         // Check authentication
-        const authRes = await api.get('/check-auth', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const authRes = await api.get('/check-auth');
         if (!authRes.data || authRes.data.role !== 'admin') {
           toast.error('Admin access required');
-          localStorage.removeItem('token');
           navigate('/login');
           return;
         }
         setUser(authRes.data);
 
         // Fetch reservations
-        const resResponse = await api.get('/reservations', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const resResponse = await api.getReservations();
         setReservations(resResponse.data || []);
 
         // Fetch available tables
-        const tableResponse = await api.get('/tables', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const tableResponse = await api.getAvailableTables();
         setTables(tableResponse.data || []);
 
-        // Initialize Socket.IO with JWT token
-        const socketCleanup = initSocket(
-          {
-            onTableStatusUpdate: (data) => {
-              setTables((prev) =>
-                prev.map((table) =>
-                  table.id === data.table_id ? { ...table, status: data.status } : table
-                )
-              );
-              toast.info(`Table ${data.table_id} status updated to ${data.status}`);
-            },
-            onReservationUpdate: (reservation) => {
-              setReservations((prev) => {
-                const updated = [
-                  reservation,
-                  ...prev.filter((r) => r.id !== reservation.id),
-                ].sort((a, b) => b.id - a.id); // Sort by ID descending
-                setFilteredReservations(updated);
-                return updated;
-              });
-              toast.success(
-                `Reservation #${reservation.id} updated for table ${reservation.table_number}`
-              );
-            },
-            onReservationCreate: (reservation) => {
-              setReservations((prev) => {
-                const updated = [reservation, ...prev].sort((a, b) => b.id - a.id);
-                setFilteredReservations(updated);
-                return updated;
-              });
-              toast.success(`New reservation #${reservation.id} created`);
-            },
-            onReservationDelete: (data) => {
-              setReservations((prev) => {
-                const updated = prev.filter((r) => r.id !== data.reservationId);
-                setFilteredReservations(updated);
-                return updated;
-              });
-              toast.info(`Reservation #${data.reservationId} deleted`);
-            },
+        // Initialize Socket.IO
+        const socketCleanup = initSocket({
+          onTableStatusUpdate: (data) => {
+            setTables((prev) =>
+              prev.map((table) =>
+                table.id === data.table_id ? { ...table, status: data.status } : table
+              )
+            );
+            toast.info(`Table ${data.table_id} status updated to ${data.status}`);
           },
-          token
-        );
+          onReservationUpdate: (reservation) => {
+            setReservations((prev) => {
+              const updated = [
+                reservation,
+                ...prev.filter((r) => r.id !== reservation.id),
+              ].sort((a, b) => b.id - a.id); // Sort by ID descending
+              setFilteredReservations(updated);
+              return updated;
+            });
+            toast.success(
+              `Reservation #${reservation.id} updated for table ${reservation.table_number}`
+            );
+          },
+        });
 
-        return () => {
-          if (typeof socketCleanup === 'function') socketCleanup();
-        };
+        return () => socketCleanup();
       } catch (err) {
         console.error('Initialization failed:', err);
-        if (err.response?.status === 401) {
-          toast.error('Session expired. Please log in again.');
-          localStorage.removeItem('token');
-        } else {
-          toast.error(err.response?.data?.error || 'Failed to load data');
-        }
+        toast.error(err.response?.data?.error || 'Failed to load data');
         navigate('/login');
       } finally {
         setIsLoading(false);
@@ -579,20 +539,12 @@ function AdminTableReservations() {
 
     try {
       setIsLoading(true);
-      const token = localStorage.getItem('token');
-      if (!token) {
-        toast.error('Please log in');
-        navigate('/login');
-        return;
-      }
       const formattedData = {
         ...formData,
         reservation_time: formatToMySQLDateTime(formData.reservation_time),
         user_id: user.id,
       };
-      await api.post('/reservations', formattedData, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await api.addReservation(formattedData);
       toast.success('Reservation created successfully');
       setShowCreateModal(false);
       setFormData({
@@ -601,23 +553,15 @@ function AdminTableReservations() {
         phone_number: '',
         status: 'pending',
       });
-      const response = await api.get('/reservations', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await api.getReservations();
       setReservations(response.data || []);
     } catch (err) {
       console.error('Error creating reservation:', err);
-      if (err.response?.status === 401) {
-        toast.error('Session expired. Please log in again.');
-        localStorage.removeItem('token');
-        navigate('/login');
-      } else {
-        toast.error(
-          err.response?.data?.errors?.[0]?.msg ||
-            err.response?.data?.error ||
-            'Failed to create reservation'
-        );
-      }
+      toast.error(
+        err.response?.data?.errors?.[0]?.msg ||
+          err.response?.data?.error ||
+          'Failed to create reservation'
+      );
     } finally {
       setIsLoading(false);
     }
@@ -631,20 +575,12 @@ function AdminTableReservations() {
 
     try {
       setIsLoading(true);
-      const token = localStorage.getItem('token');
-      if (!token) {
-        toast.error('Please log in');
-        navigate('/login');
-        return;
-      }
       const formattedData = {
         ...formData,
         reservation_time: formatToMySQLDateTime(formData.reservation_time),
         user_id: user.id,
       };
-      await api.put(`/reservations/${selectedReservation.id}`, formattedData, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await api.updateReservation(selectedReservation.id, formattedData);
       toast.success('Reservation updated successfully');
       setShowEditModal(false);
       setSelectedReservation(null);
@@ -654,23 +590,15 @@ function AdminTableReservations() {
         phone_number: '',
         status: 'pending',
       });
-      const response = await api.get('/reservations', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await api.getReservations();
       setReservations(response.data || []);
     } catch (err) {
       console.error('Error updating reservation:', err);
-      if (err.response?.status === 401) {
-        toast.error('Session expired. Please log in again.');
-        localStorage.removeItem('token');
-        navigate('/login');
-      } else {
-        toast.error(
-          err.response?.data?.errors?.[0]?.msg ||
-            err.response?.data?.error ||
-            'Failed to update reservation'
-        );
-      }
+      toast.error(
+        err.response?.data?.errors?.[0]?.msg ||
+          err.response?.data?.error ||
+          'Failed to update reservation'
+      );
     } finally {
       setIsLoading(false);
     }
@@ -681,30 +609,15 @@ function AdminTableReservations() {
 
     try {
       setIsLoading(true);
-      const token = localStorage.getItem('token');
-      if (!token) {
-        toast.error('Please log in');
-        navigate('/login');
-        return;
-      }
-      await api.delete(`/reservations/${reservationId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { user_id: user.id },
-      });
+      await api.deleteReservation(reservationId, { user_id: user.id });
       toast.success('Reservation deleted successfully');
       setReservations((prev) => prev.filter((r) => r.id !== reservationId));
       setFilteredReservations((prev) => prev.filter((r) => r.id !== reservationId));
     } catch (err) {
       console.error('Error deleting reservation:', err);
-      if (err.response?.status === 401) {
-        toast.error('Session expired. Please log in again.');
-        localStorage.removeItem('token');
-        navigate('/login');
-      } else {
-        toast.error(
-          err.response?.data?.error || 'Failed to delete reservation'
-        );
-      }
+      toast.error(
+        err.response?.data?.error || 'Failed to delete reservation'
+      );
     } finally {
       setIsLoading(false);
     }
@@ -753,28 +666,16 @@ function AdminTableReservations() {
   const refreshReservations = async () => {
     setIsLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        toast.error('Please log in');
-        navigate('/login');
-        return;
-      }
       const [resResponse, tableResponse] = await Promise.all([
-        api.get('/reservations', { headers: { Authorization: `Bearer ${token}` } }),
-        api.get('/tables', { headers: { Authorization: `Bearer ${token}` } }),
+        api.getReservations(),
+        api.getAvailableTables(),
       ]);
       setReservations(resResponse.data || []);
       setTables(tableResponse.data || []);
       toast.success('Data refreshed');
     } catch (err) {
       console.error('Error refreshing data:', err);
-      if (err.response?.status === 401) {
-        toast.error('Session expired. Please log in again.');
-        localStorage.removeItem('token');
-        navigate('/login');
-      } else {
-        toast.error('Failed to refresh data');
-      }
+      toast.error('Failed to refresh data');
     } finally {
       setIsLoading(false);
     }

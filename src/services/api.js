@@ -2,20 +2,12 @@ import axios from 'axios';
 
 const api = axios.create({
   baseURL: `${import.meta.env.VITE_API_URL || 'https://coffee-ordering-backend1-production.up.railway.app'}/api`,
-  withCredentials: false,
+  withCredentials: true,
 });
 
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
-    const sessionId = localStorage.getItem('sessionId');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    if (sessionId) {
-      config.headers['X-Session-Id'] = sessionId;
-    }
-    console.log(`[${config.method.toUpperCase()}] ${config.url}`, config.headers);
+    console.log(`[${config.method.toUpperCase()}] ${config.url}`);
     return config;
   },
   (error) => {
@@ -26,16 +18,17 @@ api.interceptors.request.use(
 
 api.interceptors.response.use(
   (response) => {
-    console.log(`[Response] ${response.config.url}: ${response.status}`, response.headers);
+    console.log(`[Response] ${response.config.url}: ${response.status}`);
     return response;
   },
   (error) => {
     const message = error.response?.data?.error || error.message;
-    console.error(`[Error] ${error.config?.url}: ${message}`, error.response?.headers);
+    console.error(`[Error] ${error.config?.url}: ${message}`);
     return Promise.reject(error);
   }
 );
 
+// API methods (same as localhost)
 api.getNotifications = (params) => api.get('/notifications', { params });
 api.markNotificationRead = (id) => api.put(`/notifications/${id}/read`);
 api.clearNotifications = () => api.put('/notifications/clear');

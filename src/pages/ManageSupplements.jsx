@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { toast } from 'react-toastify';
-import { useNavigate } from 'react-router-dom';
 import {
   AddCircleOutline,
   DeleteOutline,
@@ -24,74 +23,38 @@ function ManageSupplements() {
   const [isAddFormOpen, setIsAddFormOpen] = useState(false);
   const [isAssignFormOpen, setIsAssignFormOpen] = useState(false);
   const [user, setUser] = useState(null);
-  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const token = localStorage.getItem('token');
-        if (!token) {
-          toast.error('Please log in');
-          navigate('/login');
-          return;
-        }
-
-        // Check authentication
-        const userResponse = await api.get('/check-auth');
-        if (!userResponse.data?.id || userResponse.data.role !== 'admin') {
-          toast.error('Admin access required');
-          localStorage.removeItem('token');
-          navigate('/login');
-          return;
-        }
-        setUser(userResponse.data);
-
-        // Fetch supplements and menu items
-        const [supplementsResponse, menuItemsResponse] = await Promise.all([
+        const [supplementsResponse, menuItemsResponse, userResponse] = await Promise.all([
           api.get('/supplements'),
           api.get('/menu-items'),
+          api.get('/check-auth')
         ]);
         setSupplements(supplementsResponse.data || []);
         setMenuItems(menuItemsResponse.data || []);
+        setUser(userResponse.data || null);
       } catch (error) {
-        console.error('Initialization error:', error);
-        if (error.response?.status === 401) {
-          toast.error('Session expired. Please log in again.');
-          localStorage.removeItem('token');
-          navigate('/login');
-        } else {
-          toast.error(error.response?.data?.error || 'Failed to load data');
-        }
+        toast.error(error.response?.data?.error || 'Failed to load data');
       } finally {
         setLoading(false);
       }
     };
     fetchData();
-  }, [navigate]);
+  }, []);
 
   const handleAddSupplement = async (e) => {
     e.preventDefault();
-    if (!user) {
-      toast.error('You must be logged in to add supplements');
-      navigate('/login');
-      return;
-    }
     if (!newSupplementName.trim() || !newSupplementPrice || isNaN(newSupplementPrice) || parseFloat(newSupplementPrice) < 0) {
       toast.error('Please provide a valid supplement name and price');
       return;
     }
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        toast.error('Please log in');
-        navigate('/login');
-        return;
-      }
       const response = await api.post('/supplements', {
         name: newSupplementName,
-        price: parseFloat(newSupplementPrice),
-        user_id: user.id
+        price: parseFloat(newSupplementPrice)
       });
       setSupplements([...supplements, response.data]);
       setNewSupplementName('');
@@ -99,45 +62,24 @@ function ManageSupplements() {
       setIsAddFormOpen(false);
       toast.success('Supplement added successfully');
     } catch (error) {
-      console.error('Add supplement error:', error);
-      if (error.response?.status === 401) {
-        toast.error('Session expired. Please log in again.');
-        localStorage.removeItem('token');
-        navigate('/login');
-      } else {
-        toast.error(error.response?.data?.error || 'Failed to add supplement');
-      }
+      toast.error(error.response?.data?.error || 'Failed to add supplement');
     }
   };
 
   const handleDeleteSupplement = async (supplementId) => {
     if (!user) {
       toast.error('You must be logged in to delete supplements');
-      navigate('/login');
       return;
     }
     if (!window.confirm('Are you sure you want to delete this supplement?')) return;
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        toast.error('Please log in');
-        navigate('/login');
-        return;
-      }
       await api.delete(`/supplements/${supplementId}`, {
         data: { user_id: user.id }
       });
       setSupplements(supplements.filter(s => s.id !== supplementId));
       toast.success('Supplement deleted successfully');
     } catch (error) {
-      console.error('Delete supplement error:', error);
-      if (error.response?.status === 401) {
-        toast.error('Session expired. Please log in again.');
-        localStorage.removeItem('token');
-        navigate('/login');
-      } else {
-        toast.error(error.response?.data?.error || 'Failed to delete supplement');
-      }
+      toast.error(error.response?.data?.error || 'Failed to delete supplement');
     }
   };
 
@@ -145,7 +87,6 @@ function ManageSupplements() {
     e.preventDefault();
     if (!user) {
       toast.error('You must be logged in to assign supplements');
-      navigate('/login');
       return;
     }
     if (!selectedMenuItem || !additionalPrice || isNaN(additionalPrice) || parseFloat(additionalPrice) < 0) {
@@ -153,12 +94,6 @@ function ManageSupplements() {
       return;
     }
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        toast.error('Please log in');
-        navigate('/login');
-        return;
-      }
       const selectedSupplement = supplements.find(s => s.id === parseInt(selectedMenuItem.split('-')[1]));
       const menuItemId = parseInt(selectedMenuItem.split('-')[0]);
       await api.post(`/menu-items/${menuItemId}/supplements`, {
@@ -174,31 +109,17 @@ function ManageSupplements() {
       setIsAssignFormOpen(false);
       toast.success('Supplement assigned successfully');
     } catch (error) {
-      console.error('Assign supplement error:', error);
-      if (error.response?.status === 401) {
-        toast.error('Session expired. Please log in again.');
-        localStorage.removeItem('token');
-        navigate('/login');
-      } else {
-        toast.error(error.response?.data?.error || 'Failed to assign supplement');
-      }
+      toast.error(error.response?.data?.error || 'Failed to assign supplement');
     }
   };
 
   const handleRemoveAssignment = async (menuItemId, supplementId) => {
     if (!user) {
       toast.error('You must be logged in to remove supplement assignments');
-      navigate('/login');
       return;
     }
     if (!window.confirm('Are you sure you want to remove this supplement assignment?')) return;
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        toast.error('Please log in');
-        navigate('/login');
-        return;
-      }
       await api.delete(`/menu-items/${menuItemId}/supplements/${supplementId}`, {
         data: { user_id: user.id }
       });
@@ -206,14 +127,7 @@ function ManageSupplements() {
       setSupplements(updatedSupplements.data || []);
       toast.success('Supplement assignment removed successfully');
     } catch (error) {
-      console.error('Remove supplement assignment error:', error);
-      if (error.response?.status === 401) {
-        toast.error('Session expired. Please log in again.');
-        localStorage.removeItem('token');
-        navigate('/login');
-      } else {
-        toast.error(error.response?.data?.error || 'Failed to remove supplement assignment');
-      }
+      toast.error(error.response?.data?.error || 'Failed to remove supplement assignment');
     }
   };
 
@@ -495,6 +409,7 @@ function ManageSupplements() {
       fontSize: '14px',
       color: '#9ca3af'
     },
+    // Mobile responsive styles
     '@media (max-width: 768px)': {
       container: {
         padding: '16px'

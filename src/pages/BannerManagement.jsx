@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../services/api';
 import { toast } from 'react-toastify';
-import { initSocket } from '../services/socket';
 
 function BannerManagement() {
   const [banners, setBanners] = useState([]);
@@ -13,13 +12,9 @@ function BannerManagement() {
   useEffect(() => {
     const fetchUserAndBanners = async () => {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          toast.error('Please log in');
-          return;
-        }
         const response = await api.get('/check-auth');
         const currentUser = response.data;
+        console.log('Session response:', currentUser); // Debug log
         if (!currentUser || !currentUser.id) {
           toast.error('User not authenticated. Please log in again.');
           return;
@@ -31,7 +26,8 @@ function BannerManagement() {
         setUserId(currentUser.id);
         setIsAdmin(true);
 
-        const bannersResponse = await api.get('/banners', { params: { user_id: currentUser.id } });
+        const bannersResponse = await api.getBanners({ user_id: currentUser.id });
+        console.log('Banners response:', bannersResponse.data); // Debug log
         setBanners(bannersResponse.data || []);
       } catch (error) {
         console.error('Error fetching session or banners:', error);
@@ -40,36 +36,6 @@ function BannerManagement() {
     };
 
     fetchUserAndBanners();
-
-    const socketCleanup = initSocket(
-      () => {},
-      () => {},
-      () => {},
-      () => {},
-      () => {},
-      () => {},
-      () => {},
-      (banner) => {
-        setBanners((prev) => [...prev, banner]);
-        toast.success(`New banner #${banner.id} created`);
-      },
-      (updatedBanner) => {
-        setBanners((prev) =>
-          prev.map((b) => (b.id === updatedBanner.id ? { ...b, ...updatedBanner } : b))
-        );
-        toast.info(`Banner #${updatedBanner.id} updated`);
-      },
-      (deletedBanner) => {
-        setBanners((prev) => prev.filter((b) => b.id !== deletedBanner.id));
-        toast.info(`Banner #${deletedBanner.id} deleted`);
-      },
-      () => {},
-      () => {}
-    );
-
-    return () => {
-      if (typeof socketCleanup === 'function') socketCleanup();
-    };
   }, []);
 
   const handleInputChange = (e) => {
@@ -97,15 +63,16 @@ function BannerManagement() {
     }
 
     try {
+      console.log('Submitting banner with user_id:', userId); // Debug log
       if (form.id) {
-        await api.put(`/banners/${form.id}`, formData);
+        await api.updateBanner(form.id, formData);
         toast.success('Banner updated successfully');
       } else {
-        await api.post('/banners', formData);
+        await api.addBanner(formData);
         toast.success('Banner created successfully');
       }
 
-      const response = await api.get('/banners', { params: { user_id: userId } });
+      const response = await api.getBanners({ user_id: userId });
       setBanners(response.data || []);
       setForm({ id: null, link: '', is_enabled: true, image: null });
     } catch (error) {
@@ -137,7 +104,8 @@ function BannerManagement() {
     if (!window.confirm('Are you sure you want to delete this banner?')) return;
 
     try {
-      await api.delete(`/banners/${id}`, { params: { user_id: userId } });
+      await api.deleteBanner(id, { user_id: userId });
+      setBanners(banners.filter((banner) => banner.id !== id));
       toast.success('Banner deleted successfully');
     } catch (error) {
       console.error('Error deleting banner:', error);
@@ -156,7 +124,12 @@ function BannerManagement() {
       formData.append('link', banner.link);
       formData.append('is_enabled', !banner.is_enabled);
 
-      await api.put(`/banners/${banner.id}`, formData);
+      await api.updateBanner(banner.id, formData);
+      setBanners(
+        banners.map((b) =>
+          b.id === banner.id ? { ...b, is_enabled: !b.is_enabled } : b
+        )
+      );
       toast.success(`Banner ${banner.is_enabled ? 'disabled' : 'enabled'} successfully`);
     } catch (error) {
       console.error('Error toggling banner status:', error);
