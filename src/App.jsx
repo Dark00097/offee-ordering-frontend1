@@ -2,8 +2,7 @@ import { Routes, Route, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import { api } from './services/api';
-import { v4 as uuidv4 } from 'uuid';
-import { initSocket, reinitializeSocket } from './services/socket'; // Import reinitializeSocket
+import { initSocket, reinitializeSocket } from './services/socket';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import AdminDashboard from './pages/AdminDashboard';
@@ -42,8 +41,7 @@ function App() {
   const [error, setError] = useState(null);
   const [latestOrderId, setLatestOrderId] = useState(null);
   const [user, setUser] = useState(null);
-  const [sessionId, setSessionId] = useState(null);
-  const [socketCleanup, setSocketCleanup] = useState(null); // Track socket cleanup function
+  const [socketCleanup, setSocketCleanup] = useState(null);
 
   const handleNewNotification = (notification) => {
     if (!notification.id) {
@@ -69,47 +67,30 @@ function App() {
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        const response = await api.get('/session');
-        const serverSessionId = response.data.sessionId;
-        if (serverSessionId) {
-          setSessionId(serverSessionId);
-          localStorage.setItem('sessionId', serverSessionId);
-          api.defaults.headers.common['X-Session-Id'] = serverSessionId;
-        } else {
-          const fallbackSessionId = localStorage.getItem('sessionId') || `guest-${uuidv4()}`;
-          setSessionId(fallbackSessionId);
-          localStorage.setItem('sessionId', fallbackSessionId);
-          api.defaults.headers.common['X-Session-Id'] = fallbackSessionId;
-        }
+        const checkAuth = async () => {
+          try {
+            const res = await api.get('/check-auth');
+            setUser(res.data);
+          } catch (err) {
+            setUser(null);
+          }
+        };
+
+        const fetchPromotions = async () => {
+          try {
+            const response = await api.get('/promotions');
+            setPromotions(response.data || []);
+          } catch (error) {
+            toast.error(error.response?.data?.error || 'Failed to load promotions');
+            setPromotions([]);
+          }
+        };
+
+        await Promise.all([checkAuth(), fetchPromotions()]);
+        initializeSocket();
       } catch (error) {
-        console.error('Error fetching session ID:', error);
-        const fallbackSessionId = localStorage.getItem('sessionId') || `guest-${uuidv4()}`;
-        setSessionId(fallbackSessionId);
-        localStorage.setItem('sessionId', fallbackSessionId);
-        api.defaults.headers.common['X-Session-Id'] = fallbackSessionId;
+        console.error('Error initializing app:', error);
       }
-
-      const checkAuth = async () => {
-        try {
-          const res = await api.get('/check-auth');
-          setUser(res.data);
-        } catch (err) {
-          setUser(null);
-        }
-      };
-
-      const fetchPromotions = async () => {
-        try {
-          const response = await api.get('/promotions');
-          setPromotions(response.data || []);
-        } catch (error) {
-          toast.error(error.response?.data?.error || 'Failed to load promotions');
-          setPromotions([]);
-        }
-      };
-
-      await Promise.all([checkAuth(), fetchPromotions()]);
-      initializeSocket(); // Initialize socket after session setup
     };
 
     initializeApp();
@@ -121,29 +102,17 @@ function App() {
 
   const handleLogin = async (user) => {
     setUser(user);
-    // Refresh session ID after login
-    try {
-      const response = await api.get('/session');
-      const newSessionId = response.data.sessionId;
-      if (newSessionId) {
-        setSessionId(newSessionId);
-        localStorage.setItem('sessionId', newSessionId);
-        api.defaults.headers.common['X-Session-Id'] = newSessionId;
-        // Reinitialize socket with new session ID
-        const cleanup = reinitializeSocket({
-          onNewOrder: () => {},
-          onOrderUpdate: () => {},
-          onTableStatusUpdate: () => {},
-          onReservationUpdate: () => {},
-          onRatingUpdate: () => {},
-          onOrderApproved: () => {},
-          onNewNotification: handleNewNotification,
-        });
-        setSocketCleanup(() => cleanup);
-      }
-    } catch (error) {
-      console.error('Error refreshing session ID after login:', error);
-    }
+    // Reinitialize socket after login
+    const cleanup = reinitializeSocket({
+      onNewOrder: () => {},
+      onOrderUpdate: () => {},
+      onTableStatusUpdate: () => {},
+      onReservationUpdate: () => {},
+      onRatingUpdate: () => {},
+      onOrderApproved: () => {},
+      onNewNotification: handleNewNotification,
+    });
+    setSocketCleanup(() => cleanup);
     navigate(user.role === 'admin' ? '/admin' : '/staff');
   };
 
@@ -155,7 +124,6 @@ function App() {
       setDeliveryAddress('');
       setPromotionId('');
       setIsCartOpen(false);
-      // Reinitialize socket after logout
       initializeSocket();
       toast.success('Successfully logged out');
       navigate('/');
@@ -190,7 +158,7 @@ function App() {
         return [
           ...prev,
           {
-            cartItemId: uuidv4(),
+            cartItemId: item.cartItemId || Math.random().toString(36).substr(2, 9),
             item_id: item.item_id,
             quantity: item.quantity || 1,
             unit_price: parseFloat(item.unit_price || 0),
@@ -224,7 +192,7 @@ function App() {
         return [
           ...prev,
           {
-            cartItemId: uuidv4(),
+            cartItemId: item.cartItemId || Math.random().toString(36).substr(2, 9),
             breakfast_id: item.breakfast_id,
             quantity: item.quantity || 1,
             unit_price: parseFloat(item.unit_price || 0),
@@ -354,10 +322,6 @@ function App() {
     return <div style={{ textAlign: 'center', padding: '20px', color: 'red' }}>{error}</div>;
   }
 
-  if (!sessionId) {
-    return <div style={{ textAlign: 'center', padding: '20px' }}>Initializing session...</div>;
-  }
-
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px', minHeight: '100vh' }}>
       <Header
@@ -387,7 +351,7 @@ function App() {
         <Route path="/staff/table-reservations" element={<StaffTableReservations />} />
         <Route path="/category/:id" element={<CategoryMenu addToCart={addToCart} />} />
         <Route path="/product/:id" element={<ProductDetails addToCart={addToCart} latestOrderId={latestOrderId} />} />
-        <Route path="/order-waiting/:orderId" element={<OrderWaiting sessionId={sessionId} />} />
+        <Route path="/order-waiting/:orderId" element={<OrderWaiting />} />
         <Route path="/breakfast" element={<BreakfastMenu addToCart={addToCart} />} />
         <Route path="/breakfast/:id" element={<BreakfastMenu addToCart={addToCart} />} />
         <Route path="*" element={<div style={{ textAlign: 'center', color: '#666' }}>404 Not Found</div>} />
@@ -405,7 +369,6 @@ function App() {
         setPromotionId={setPromotionId}
         promotions={promotions}
         clearCart={clearCart}
-        sessionId={sessionId}
       />
       <Footer />
     </div>
