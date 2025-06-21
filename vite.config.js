@@ -8,9 +8,14 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'https://coffee-ordering-backend1-production.up.railway.app',
+        target: process.env.VITE_API_URL || 'https://coffee-ordering-backend1-production.up.railway.app',
         changeOrigin: true,
         secure: true,
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq) => {
+            proxyReq.setHeader('Origin', 'https://offee-ordering-frontend1-production.up.railway.app');
+          });
+        },
       },
     },
   },

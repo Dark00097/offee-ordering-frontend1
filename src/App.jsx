@@ -105,7 +105,7 @@ function App() {
     return () => {
       if (socketCleanup) socketCleanup();
     };
-  }, []); // Empty dependency array to run once on mount
+  }, []);
 
   const handleLogin = async (user) => {
     setUser(user);
