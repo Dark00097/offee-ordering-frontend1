@@ -30,8 +30,8 @@ export const initSocket = (
   const initializeSocket = async () => {
     try {
       const response = await api.get('/session', { withCredentials: true });
-      if (response.status !== 200 || !response.data || typeof response.data !== 'object' || !response.data.sessionId) {
-        console.error('Failed to retrieve session ID from server:', response.status, response.data || 'Invalid response');
+      if (response.status !== 200 || !response.data || typeof response.data !== 'object' || response.data.includes?.('<!doctype html') || !response.data.sessionId) {
+        console.error('Failed to retrieve session ID from server:', response.status, response.data ? 'HTML response' : 'No valid data');
         return () => {};
       }
 
