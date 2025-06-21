@@ -52,7 +52,7 @@ function App() {
   };
 
   const initializeSocket = () => {
-    if (user) { // Only initialize socket for authenticated users
+    if (user) {
       const cleanup = initSocket(
         () => {},
         () => {},
@@ -73,10 +73,13 @@ function App() {
           try {
             const res = await api.get('/check-auth');
             setUser(res.data);
+            if (res.data) {
+              initializeSocket();
+            }
           } catch (err) {
             setUser(null);
             if (window.location.pathname.startsWith('/admin') || window.location.pathname.startsWith('/staff')) {
-              navigate('/login'); // Redirect to login for protected routes
+              navigate('/login');
             }
           }
         };
@@ -92,7 +95,6 @@ function App() {
         };
 
         await Promise.all([checkAuth(), fetchPromotions()]);
-        initializeSocket();
       } catch (error) {
         console.error('Error initializing app:', error);
       }
@@ -103,21 +105,23 @@ function App() {
     return () => {
       if (socketCleanup) socketCleanup();
     };
-  }, [user]); // Re-run when user changes
+  }, []); // Empty dependency array to run once on mount
 
   const handleLogin = async (user) => {
     setUser(user);
-    const cleanup = reinitializeSocket({
-      onNewOrder: () => {},
-      onOrderUpdate: () => {},
-      onTableStatusUpdate: () => {},
-      onReservationUpdate: () => {},
-      onRatingUpdate: () => {},
-      onOrderApproved: () => {},
-      onNewNotification: handleNewNotification,
-    });
-    setSocketCleanup(() => cleanup);
-    navigate(user.role === 'admin' ? '/admin' : '/staff');
+    try {
+      const authCheck = await api.get('/check-auth');
+      if (authCheck.data) {
+        initializeSocket();
+        navigate(user.role === 'admin' ? '/admin' : '/staff');
+      } else {
+        throw new Error('Session not established');
+      }
+    } catch (error) {
+      toast.error('Failed to verify session');
+      setUser(null);
+      navigate('/login');
+    }
   };
 
   const handleLogout = async () => {
