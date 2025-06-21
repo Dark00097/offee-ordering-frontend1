@@ -30,8 +30,8 @@ export const initSocket = (
   const initializeSocket = async () => {
     try {
       const response = await api.get('/session', { withCredentials: true });
-      if (!response.data || typeof response.data !== 'object' || !response.data.sessionId) {
-        console.error('Failed to retrieve session ID from server:', response.data || 'No data');
+      if (!response.data || typeof response.data !== 'object' || response.status !== 200 || !response.data.sessionId) {
+        console.error('Failed to retrieve session ID from server:', response.status, response.data || 'No valid data');
         return () => {};
       }
 
@@ -126,7 +126,7 @@ export const initSocket = (
 
       console.log('Socket initialized with session:', sessionId);
     } catch (error) {
-      console.error('Error initializing socket:', error.message, error.response?.data);
+      console.error('Error initializing socket:', error.message, error.response?.data || error.response?.statusText);
       currentCleanup = () => {};
     }
   };
