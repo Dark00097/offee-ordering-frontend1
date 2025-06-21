@@ -88,7 +88,7 @@ export const initSocket = (
 
       socket.on('newNotification', (data) => {
         console.log('Received newNotification:', data);
-        if (typeof onNewNotification === sn('function') onNewNotification(data);
+        if (typeof onNewNotification === 'function') onNewNotification(data);
       });
 
       socket.on('session-error', (error) => {
